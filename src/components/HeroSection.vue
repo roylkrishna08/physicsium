@@ -1,44 +1,52 @@
+<script setup>
+import { useLanguage } from '../composables/useLanguage.js'
+import SolarSystem from './SolarSystem.vue'
+const { t } = useLanguage()
+</script>
+
 <template>
   <header class="hero container">
     <div class="hero-content">
-      <div class="pill">🚀 Physics for Top Rankers</div>
+      <div class="pill">{{ t('hero.pill') }}</div>
       <h1 class="hero-title">
-        Decode the <br />
-        <span class="text-gradient">Universe</span>
+        {{ t('hero.title_prefix') }} <br />
+        <span class="text-gradient">{{ t('hero.title_suffix') }}</span>
       </h1>
+      
+      <!-- Mobile Interleaved Solar System -->
+      <div class="mobile-solar-container">
+          <SolarSystem />
+      </div>
+
       <p class="hero-subtitle">
-        Visualise concepts, master properties, and ace your JEE & NEET exams with our premium interactive learning platform.
+        {{ t('hero.subtitle') }}
       </p>
       <div class="hero-actions">
-        <button class="btn-primary">Start Learning Free</button>
-        <button class="btn-outline">Watch Demo</button>
+        <button class="btn-primary">{{ t('hero.cta_primary') }}</button>
+        <button class="btn-outline">{{ t('hero.cta_secondary') }}</button>
       </div>
       
       <div class="stats-row">
         <div class="stat">
             <span class="num">150+</span>
-            <span class="label">Chapters</span>
+            <span class="label">{{ t('hero.stats_chapters') }}</span>
         </div>
          <div class="stat">
             <span class="num">10k+</span>
-            <span class="label">Questions</span>
+            <span class="label">{{ t('hero.stats_questions') }}</span>
         </div>
       </div>
     </div>
     
     <div class="hero-visual">
-       <div class="atom-container">
-         <div class="core"></div>
-         <div class="orbit orbit-1"><div class="electron"></div></div>
-         <div class="orbit orbit-2"><div class="electron"></div></div>
-         <div class="orbit orbit-3"><div class="electron"></div></div>
-       </div>
+       <SolarSystem />
        <div class="glow-backdrop"></div>
     </div>
   </header>
 </template>
 
 <style scoped>
+/* ... (Keep existing layout styles) ... */
 .hero {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -70,6 +78,20 @@
   margin-bottom: 1.5rem;
 }
 
+/* Mobile Solar Container - Hidden by default */
+.mobile-solar-container {
+    display: none;
+    height: 180px; 
+    align-items: center;
+    justify-content: center;
+    margin: 0.5rem 0 1rem 0;
+    overflow: hidden;
+    perspective: 1000px;
+    pointer-events: none;
+    width: 100%; /* Force container to fit parent */
+    max-width: 100vw;
+}
+
 .hero-subtitle {
   font-size: 1.2rem;
   color: var(--text-secondary);
@@ -82,7 +104,6 @@
   gap: 1rem;
   margin-bottom: 3rem;
 }
-
 .btn-outline {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.2);
@@ -123,85 +144,23 @@
     color: var(--text-secondary);
 }
 
-/* Atom Animation */
+/* Visual Section (Desktop) */
 .hero-visual {
   position: relative;
-  height: 500px;
+  height: 600px;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.atom-container {
-  position: relative;
-  width: 300px;
-  height: 300px;
-  transform-style: preserve-3d;
-  perspective: 1000px;
-}
-
-.core {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 40px;
-  height: 40px;
-  background: radial-gradient(circle at 30% 30%, #fff, var(--primary-glow));
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 30px var(--primary-glow);
-  z-index: 10;
-}
-
-.orbit {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 300px;
-  height: 300px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.orbit-1 { transform: translate(-50%, -50%) rotateX(70deg) rotateY(10deg); animation: rotate 4s linear infinite; }
-.orbit-2 { transform: translate(-50%, -50%) rotateX(70deg) rotateY(70deg); animation: rotate 5s linear infinite reverse; }
-.orbit-3 { transform: translate(-50%, -50%) rotateX(70deg) rotateY(130deg); animation: rotate 6s linear infinite; }
-
-.electron {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  background: var(--accent-green);
-  border-radius: 50%;
-  transform: translate(-50%, -6px);
-  box-shadow: 0 0 10px var(--accent-green);
-}
-
-@keyframes rotate {
-  0% { transform: translate(-50%, -50%) rotateX(70deg) rotateY(var(--y-angle, 0deg)) rotateZ(0deg); }
-  100% { transform: translate(-50%, -50%) rotateX(70deg) rotateY(var(--y-angle, 0deg)) rotateZ(360deg); }
-}
-
-/* Fix animation rotation context */
-.orbit-1 { --y-angle: 10deg; }
-.orbit-2 { --y-angle: 70deg; }
-.orbit-3 { --y-angle: 130deg; }
-
-/* Overwrite animation for simplicity in keyed frames */
-@keyframes rotate {
-    to { transform: translate(-50%, -50%) rotateX(70deg) rotateY(var(--y-angle)) rotateZ(360deg); }
+  perspective: 1200px;
 }
 
 .glow-backdrop {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(255, 140, 0, 0.05) 0%, transparent 60%);
     transform: translate(-50%, -50%);
     z-index: -1;
     pointer-events: none;
@@ -209,21 +168,62 @@
 
 @media (max-width: 768px) {
     .hero {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* Single column */
         text-align: center;
         padding-top: 1rem;
+        min-height: auto;
+        padding-bottom: 4rem;
+        width: 100%; /* Ensure grid doesn't overflow */
+        overflow-x: hidden; /* Safety clip */
     }
+    
+    .hero-content {
+        order: unset;
+        min-width: 0; /* Critical for Grid to shrink items */
+        width: 100%;
+        padding: 0 1rem; /* Ensure text doesn't touch edges */
+    }
+
+    /* Show Mobile Solar System */
+    .mobile-solar-container {
+        display: flex;
+    }
+    
+    /* Child solar system needs to not force width */
+    :deep(.solar-system) {
+        max-width: 100%; /* Allow shrinking layout-wise */
+    }
+    
+    /* ... rest of query ... */
+    
+    /* Hide Desktop Solar System Container */
+    .hero-visual {
+        display: none;
+    }
+
     .hero-actions, .stats-row {
         justify-content: center;
+        flex-wrap: wrap;
     }
     .hero-title {
-        font-size: 2.5rem;
+        font-size: 2.2rem; /* Slightly smaller to fit better */
+        margin-bottom: 1rem;
+        word-wrap: break-word; /* Ensure breaking */
+        line-height: 1.2;
     }
-    .hero-visual {
-        height: 300px;
+    .hero-subtitle {
+        font-size: 1rem;
+        margin-bottom: 2rem;
+        padding: 0 1rem; /* Extra padding for subtitle */
     }
-    .atom-container {
-        transform: scale(0.7);
+    .btn-outline, .btn-primary {
+        padding: 10px 24px;
+        font-size: 0.95rem;
+    }
+}
+@media (max-width: 400px) {
+    .hero-title {
+        font-size: 1.8rem; /* Even smaller for very narrow screens */
     }
 }
 </style>
