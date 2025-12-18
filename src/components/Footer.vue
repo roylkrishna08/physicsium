@@ -12,7 +12,7 @@
             <a href="#">Contact</a>
         </div>
         <div class="copy">
-            &copy; 2024 Physicsium. All rights reserved.
+            &copy; 2025 Physicsium. All rights reserved.
         </div>
     </div>
   </footer>

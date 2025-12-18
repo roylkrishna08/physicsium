@@ -1,19 +1,21 @@
 <script setup>
-import { ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { ref, computed } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
 
 const activeExam = ref('JEE')
+const route = useRoute()
+const isLabMode = computed(() => route.path.includes('/lab'))
 </script>
 
 <template>
   <div class="app-layout">
-    <NavBar :activeExam="activeExam" @update:activeExam="activeExam = $event" />
+    <NavBar v-if="!isLabMode" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
     
     <RouterView :activeExam="activeExam" />
   
-    <Footer />
+    <Footer v-if="!isLabMode" />
   </div>
 </template>
 

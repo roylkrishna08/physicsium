@@ -1,6 +1,5 @@
 <script setup>
 import HeroSection from '../components/HeroSection.vue'
-import { useLanguage } from '../composables/useLanguage.js'
 import UniverseBg from '../components/UniverseBg.vue'
 
 const props = defineProps({
@@ -9,8 +8,6 @@ const props = defineProps({
     required: true
   }
 })
-
-const { t } = useLanguage()
 </script>
 
 <template>
@@ -21,16 +18,16 @@ const { t } = useLanguage()
     <main class="container">
       <section class="features-section">
           <div class="scroll-reveal">
-            <h2 class="section-title">{{ t('home.title') }}</h2>
-            <p class="section-desc">{{ t('home.desc') }}</p>
+            <h2 class="section-title">Your Ambition. Our Fuel.</h2>
+            <p class="section-desc">It's not just about the syllabus. It's about who you become at the finish line.</p>
           </div>
           
           <div class="holo-grid">
               <div class="holo-card" style="--delay: 0s">
                   <div class="card-content">
                       <div class="icon-ring">💡</div>
-                      <h3>{{ t('home.card1_title') }}</h3>
-                      <p>{{ t('home.card1_desc') }}</p>
+                      <h3>Understand, Don't Memorize</h3>
+                      <p>Physics is beautiful when it clicks. We turn confusion into clarity, so you never have to blindly memorize a formula again.</p>
                   </div>
                   <div class="card-glitch"></div>
               </div>
@@ -38,8 +35,8 @@ const { t } = useLanguage()
               <div class="holo-card" style="--delay: 0.2s">
                   <div class="card-content">
                       <div class="icon-ring">🔥</div>
-                      <h3>{{ t('home.card2_title') }}</h3>
-                      <p>{{ t('home.card2_desc') }}</p>
+                      <h3>Kill the Fear</h3>
+                      <p>Anxiety comes from the unknown. We cover everything so thoroughly that by exam day, you'll have nothing left to fear.</p>
                   </div>
                    <div class="card-glitch"></div>
               </div>
@@ -47,8 +44,8 @@ const { t } = useLanguage()
               <div class="holo-card" style="--delay: 0.4s">
                   <div class="card-content">
                       <div class="icon-ring">🎓</div>
-                      <h3>{{ t('home.card3_title') }}</h3>
-                      <p>{{ t('home.card3_desc') }}</p>
+                      <h3>Claim Your Rank</h3>
+                      <p>Your dream college is waiting. We provide the map, the tools, and the belief. All you need to do is walk the path.</p>
                   </div>
                    <div class="card-glitch"></div>
               </div>
@@ -57,10 +54,10 @@ const { t } = useLanguage()
       
       <section id="banner" class="glass-card banner floating">
          <div class="banner-content">
-             <h2>{{ t('home.banner_title') }}</h2>
-             <p>{{ t('home.banner_desc', { exam: activeExam }) }}</p>
+             <h2>Ready to decode the universe?</h2>
+             <p>Start your journey with the complete {{ activeExam }} syllabus breakdown.</p>
          </div>
-         <router-link to="/syllabus" class="btn-primary">{{ t('home.banner_btn') }}</router-link>
+         <router-link to="/syllabus" class="btn-primary">View Syllabus</router-link>
       </section>
     </main>
   </div>

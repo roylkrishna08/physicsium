@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { jeeSyllabus } from '../data/jee-syllabus.js'
 import { neetSyllabus } from '../data/neet-syllabus.js'
-import { useLanguage } from '../composables/useLanguage.js'
 
 const props = defineProps({
   activeExam: {
@@ -11,30 +10,20 @@ const props = defineProps({
   }
 })
 
-const { t, currentLang } = useLanguage()
-
 const currentSyllabus = computed(() => {
   return props.activeExam === 'NEET' ? neetSyllabus : jeeSyllabus
 })
 
 const title = computed(() => {
-  return props.activeExam === 'NEET' ? `NEET 2025 ${t('syllabus.syllabus_suffix')}` : `JEE Mains 2025 ${t('syllabus.syllabus_suffix')}`
+  return props.activeExam === 'NEET' ? 'NEET 2025 Syllabus' : 'JEE Mains 2025 Syllabus'
 })
-
-const getLocaleContent = (unit, type) => {
-    if (currentLang.value === 'hi') {
-        const key = type === 'title' ? 'title_hi' : 'content_hi'
-        return unit[key] || unit[type]
-    }
-    return unit[type]
-}
 </script>
 
 <template>
   <div class="syllabus-page container">
     <header class="page-header">
       <h1 class="page-title text-gradient">{{ title }}</h1>
-      <p class="page-desc">{{ t('syllabus.subtitle') }}</p>
+      <p class="page-desc">Official Physics Syllabus (Detailed)</p>
     </header>
 
     <div class="syllabus-content">
@@ -42,10 +31,10 @@ const getLocaleContent = (unit, type) => {
         <div v-for="(unit, index) in currentSyllabus" :key="index" class="unit-card glass-card">
           <div class="unit-header">
             <span class="unit-number">{{ unit.unit }}</span>
-            <h2 class="unit-title">{{ getLocaleContent(unit, 'title') }}</h2>
+            <h2 class="unit-title">{{ unit.title }}</h2>
           </div>
           <div class="unit-body">
-            <p>{{ getLocaleContent(unit, 'content') }}</p>
+            <p>{{ unit.content }}</p>
           </div>
         </div>
       </div>

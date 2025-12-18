@@ -1,16 +1,14 @@
 <script setup>
-import { useLanguage } from '../composables/useLanguage.js'
 import SolarSystem from './SolarSystem.vue'
-const { t } = useLanguage()
 </script>
 
 <template>
   <header class="hero container">
     <div class="hero-content">
-      <div class="pill">{{ t('hero.pill') }}</div>
+      <div class="pill">🚀 Physics for Top Rankers</div>
       <h1 class="hero-title">
-        {{ t('hero.title_prefix') }} <br />
-        <span class="text-gradient">{{ t('hero.title_suffix') }}</span>
+        Decode the <br />
+        <span class="text-gradient">Universe of Physics</span>
       </h1>
       
       <!-- Mobile Interleaved Solar System -->
@@ -19,21 +17,21 @@ const { t } = useLanguage()
       </div>
 
       <p class="hero-subtitle">
-        {{ t('hero.subtitle') }}
+        Visualise concepts, master properties, and ace your JEE & NEET exams with our premium interactive learning platform.
       </p>
       <div class="hero-actions">
-        <button class="btn-primary">{{ t('hero.cta_primary') }}</button>
-        <button class="btn-outline">{{ t('hero.cta_secondary') }}</button>
+        <router-link to="/topics" class="btn-primary">Start Learning Free</router-link>
+        <button class="btn-outline">Watch Demo</button>
       </div>
       
       <div class="stats-row">
         <div class="stat">
-            <span class="num">150+</span>
-            <span class="label">{{ t('hero.stats_chapters') }}</span>
+          <span class="number">30+</span>
+          <span class="label">Chapters</span>
         </div>
-         <div class="stat">
-            <span class="num">10k+</span>
-            <span class="label">{{ t('hero.stats_questions') }}</span>
+        <div class="stat">
+          <span class="number">2000+</span>
+          <span class="label">Questions</span>
         </div>
       </div>
     </div>
