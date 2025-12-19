@@ -42,9 +42,6 @@ const selectExperiment = (id) => {
   <aside class="lab-sidebar glass-card" :class="{ collapsed: collapsed }">
     <div class="sidebar-header">
         <h3>Experiments</h3>
-        <button class="collapse-btn" @click="$emit('toggle')">
-            ←
-        </button>
     </div>
     <div class="experiments-list">
         <div 
@@ -63,27 +60,24 @@ const selectExperiment = (id) => {
 
 <style scoped>
 .lab-sidebar {
-    width: 300px;
+    width: 250px;
     height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 16px;
-    background: rgba(10, 10, 20, 0.8);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 1;
-    margin-right: 0;
+    border-radius: 0;
+    background: rgba(22, 26, 31, 0.95);
+    backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
 }
 
 .lab-sidebar.collapsed {
     width: 0;
-    opacity: 0;
     border: none;
-    margin: 0;
-    padding: 0; /* pointer-events handled by display/width usually, but let's be safe */
 }
+
 
 .sidebar-header {
     padding: 1.5rem;

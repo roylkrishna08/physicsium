@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue'
 
 const canvasRef = ref(null)
 const animationId = ref(null)
@@ -9,12 +9,12 @@ const length = ref(1.0) // meters
 const gravity = ref(9.8) // m/s^2
 const mass = ref(1.0) // kg (visual size only)
 const initialAngle = ref(30) // degrees
+const dampingCoeff = ref(0.02) // Natural air resistance approx
 
-// Mobile Panel State
-const isPanelCollapsed = ref(true)
-const togglePanel = () => {
-    isPanelCollapsed.value = !isPanelCollapsed.value
-}
+
+
+// Mobile Panel State - use injected state from Lab.vue
+const isPanelCollapsed = inject('isRightSidebarCollapsed', ref(true))
 
 // State
 let theta = (initialAngle.value * Math.PI) / 180
@@ -28,6 +28,11 @@ const stopwatchTime = ref(0)
 const isStopwatchRunning = ref(false)
 let stopwatchInterval = null
 
+// Graph State
+const showGraph = ref(false)
+const graphData = ref([])
+let prevOmega = 0
+
 // Canvas dimensions
 let width = 600
 let height = 400
@@ -37,7 +42,9 @@ let scale = 250 // pixels per meter
 const reset = () => {
     theta = (initialAngle.value * Math.PI) / 180
     omega = 0
+    prevOmega = 0
     time = 0
+    graphData.value = [] // Clear graph
     isRunning.value = false
     draw()
 }
@@ -47,16 +54,33 @@ const toggleSimulation = () => {
 }
 
 const physicsStep = (dt) => {
-    // Simple Euler integration
-    // alpha = -(g/L) * sin(theta)
-    const alpha = -(gravity.value / length.value) * Math.sin(theta)
+    // Semi-implicit Euler integration (more stable)
     
-    // Damping (air resistance)
-    const damping = 0.999
+    // Gravitational acceleration: -(g/L) * sin(theta)
+    let alpha = -(gravity.value / length.value) * Math.sin(theta)
     
+    // Damping acceleration: -(b/m) * omega
+    // b is dampingCoeff, m is mass
+    const dampingAlpha = -(dampingCoeff.value / mass.value) * omega
+    alpha += dampingAlpha
+    
+    // Update velocity
     omega += alpha * dt
-    omega *= damping
+    
+    // Peak Detection for Graph (Velocity zero-crossing)
+    if (prevOmega * omega < 0 && time > 0.1) {
+        // Turning point found. Amplitude is current theta (approx)
+        const amp = Math.abs(theta * 180 / Math.PI) // Convert to degrees for easier reading? Or keep steps? 
+        // Request says "square of amplitude". Let's use degrees squared for readable scale or rads?
+        // Degrees is friendlier.
+        const ampSq = amp * amp
+        graphData.value.push({ t: time, y: ampSq })
+    }
+    prevOmega = omega
+    
+    // Update position using new velocity
     theta += omega * dt
+    
     time += dt
 }
 
@@ -251,12 +275,113 @@ const formatTime = (ms) => {
     const m = Math.floor(ms % 1000 / 10)
     return `${s}.${m.toString().padStart(2, '0')}s`
 }
+
+// Graph Computeds
+const maxTime = computed(() => {
+    if (graphData.value.length === 0) return 10
+    return Math.max(10, graphData.value[graphData.value.length - 1].t)
+})
+
+const maxAmpSq = computed(() => {
+    // Fixed max range based on initial angle squared? Or dynamic?
+    // Dynamic is better for small angles.
+    if (graphData.value.length === 0) return initialAngle.value * initialAngle.value
+    // Should scale to initial max?
+    return Math.max(1, graphData.value[0]?.y || 100)
+})
+
+const scaledGraphPoints = computed(() => {
+    const margin = 50
+    const w = 600 - margin * 2 // 500
+    const h = 400 - margin * 2 // 300
+    
+    return graphData.value.map(p => ({
+        x: margin + (p.t / maxTime.value) * w, // Time X
+        y: 350 - (p.y / maxAmpSq.value) * h    // Amp^2 Y (Inverted)
+    }))
+})
+
+const graphPath = computed(() => {
+    if (scaledGraphPoints.value.length === 0) return ''
+    return 'M ' + scaledGraphPoints.value.map(p => `${p.x} ${p.y}`).join(' L ')
+})
+
+const decayEquation = computed(() => {
+    // A^2(t) = A0^2 * e^(-(b/m)t)
+    const A0sq = (initialAngle.value * initialAngle.value).toFixed(0)
+    const exponent = (dampingCoeff.value / mass.value).toFixed(3)
+    return `A²(t) ≈ ${A0sq} • e^(-${exponent}t)`
+})
+
+const xAxisTicks = computed(() => {
+    const ticks = []
+    const margin = 50
+    const w = 600 - margin * 2
+    // 5 ticks
+    for (let i = 0; i <= 5; i++) {
+        const val = (maxTime.value * i) / 5
+        const x = margin + (val / maxTime.value) * w
+        ticks.push({ x, val: val.toFixed(1) })
+    }
+    return ticks
+})
+
+const yAxisTicks = computed(() => {
+    const ticks = []
+    const margin = 50
+    const h = 400 - margin * 2
+    // 5 ticks
+    for (let i = 0; i <= 5; i++) {
+        const val = (maxAmpSq.value * i) / 5
+        const y = 350 - (val / maxAmpSq.value) * h
+        ticks.push({ y, val: Math.round(val) }) // Round for cleaner display
+    }
+    return ticks
+})
 </script>
 
 <template>
   <div class="sim-container">
     <div class="canvas-area" ref="containerRef">
         <canvas ref="canvasRef"></canvas>
+        
+        <!-- Graph Overlay -->
+        <div v-if="showGraph" class="graph-overlay">
+            <svg width="100%" height="100%" viewBox="0 0 600 400" preserveAspectRatio="none">
+                <!-- Grid & Axes -->
+                <line x1="50" y1="350" x2="580" y2="350" stroke="#fff" stroke-width="2" /> <!-- X Axis (Time) -->
+                <line x1="50" y1="350" x2="50" y2="50" stroke="#fff" stroke-width="2" /> <!-- Y Axis (Amp^2) -->
+                
+                <!-- Labels -->
+                <text x="300" y="390" fill="#fff" text-anchor="middle" font-size="14">Time (s)</text>
+                <text x="20" y="200" fill="#fff" text-anchor="middle" font-size="14" transform="rotate(-90, 20, 200)">Amplitude² (deg²)</text>
+                
+                <!-- Concept Note -->
+                <text x="80" y="30" fill="#aaa" font-size="12" font-style="italic">Energy (E) ∝ A²</text>
+                
+                <!-- Equation Display -->
+                <text x="580" y="30" fill="#00d4ff" text-anchor="end" font-size="16" font-family="monospace" font-weight="bold">{{ decayEquation }}</text>
+                
+                <!-- X Axis Ticks -->
+                <g v-for="(tick, i) in xAxisTicks" :key="'x'+i">
+                    <line :x1="tick.x" y1="350" :x2="tick.x" y2="355" stroke="#fff" stroke-width="1" />
+                    <text :x="tick.x" y="370" fill="#ccc" text-anchor="middle" font-size="10">{{ tick.val }}</text>
+                </g>
+
+                <!-- Y Axis Ticks -->
+                <g v-for="(tick, i) in yAxisTicks" :key="'y'+i">
+                    <line x1="45" :y1="tick.y" x2="50" :y2="tick.y" stroke="#fff" stroke-width="1" />
+                    <text x="40" :y="tick.y + 4" fill="#ccc" text-anchor="end" font-size="10">{{ tick.val }}</text>
+                </g>
+                
+                <!-- Data Path -->
+                <path :d="graphPath" fill="none" stroke="#00d4ff" stroke-width="2" />
+                
+                <!-- Points -->
+                <circle v-for="(p, i) in scaledGraphPoints" :key="i" :cx="p.x" :cy="p.y" r="3" fill="#ffd700" />
+            </svg>
+            <div class="graph-bg"></div>
+        </div>
     </div>
     
     <aside class="controls-panel glass-panel" :class="{ 'collapsed': isPanelCollapsed }">
@@ -283,8 +408,7 @@ const formatTime = (ms) => {
             </div>
         </div>
 
-        <div class="header" @click="togglePanel">
-            <div class="mobile-drag-handle"></div>
+        <div class="header">
             <h3>Controls</h3>
             <div class="main-actions" @click.stop>
                 <button class="play-btn" @click="toggleSimulation">
@@ -297,7 +421,7 @@ const formatTime = (ms) => {
         </div>
         
         <div class="scroll-content">
-
+            
             <div class="control-group">
                 <div class="label-row">
                     <label>Length (L)</label>
@@ -341,6 +465,17 @@ const formatTime = (ms) => {
                      <div class="slider-track" :style="{ width: ((initialAngle - 5) / (90 - 5)) * 100 + '%' }"></div>
                 </div>
             </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <label>Dissipation (Damping)</label>
+                    <span class="value">{{ dampingCoeff }}</span>
+                </div>
+                <div class="slider-container">
+                    <input type="range" v-model.number="dampingCoeff" min="0" max="0.5" step="0.01">
+                     <div class="slider-track" :style="{ width: (dampingCoeff / 0.5) * 100 + '%' }"></div>
+                </div>
+            </div>
             
             <div class="info-box glass-inset">
                  <h4>Physics Data</h4>
@@ -349,6 +484,13 @@ const formatTime = (ms) => {
                     <span class="highlight">≈ {{ (2 * Math.PI * Math.sqrt(length/gravity)).toFixed(2) }}s</span>
                  </div>
                  <div class="formula">T = 2π√(L/g)</div>
+            </div>
+
+            <!-- Graph Toggle (Bottom) -->
+            <div class="control-group">
+                <button class="btn-primary" @click="showGraph = !showGraph" style="background: var(--primary-glow); color:#000;">
+                    {{ showGraph ? 'Hide Graph' : 'Show Energy Graph' }}
+                </button>
             </div>
         </div>
     </aside>
@@ -376,14 +518,21 @@ const formatTime = (ms) => {
 }
 
 .controls-panel {
-    width: 300px;
+    width: 320px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: rgba(10, 10, 15, 0.85);
+    background: rgba(15, 23, 42, 0.9); /* Match Exp 2 Darker Blue-Slate */
     backdrop-filter: blur(20px);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, width 0.3s ease;
     z-index: 20;
+}
+
+.controls-panel.collapsed {
+    width: 0;
+    overflow: hidden;
+    border: none;
 }
 
 .header {
@@ -485,14 +634,15 @@ const formatTime = (ms) => {
     font-size: 0.85rem;
 }
 
-/* Custom Range Slider */
+/* Premium Technical Range Slider */
 .slider-container {
     position: relative;
-    height: 6px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
+    height: 8px; /* Slightly thicker for premium feel */
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
     display: flex;
     align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .slider-track {
@@ -500,9 +650,10 @@ const formatTime = (ms) => {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--primary-glow, #00d4ff);
-    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(0, 212, 255, 0.3), rgba(0, 212, 255, 0.8));
+    border-radius: 4px;
     pointer-events: none;
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
 }
 
 input[type="range"] {
@@ -515,8 +666,32 @@ input[type="range"] {
     left: 0;
     top: 0;
     margin: 0;
-    z-index: 2;
+    z-index: 5;
     cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 24px;
+    background: #fff;
+    border: 2px solid var(--primary-glow);
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scaleX(1.1) scaleY(1.05);
+    background: var(--primary-glow);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+    transform: scale(0.95);
+    background: #fff;
 }
 
 /* ... (other slider styles) ... */
@@ -672,81 +847,81 @@ input[type="range"] {
     }
 }
 
-/* Mobile Screens */
+/* Mobile Screens - Vertical Split Layout (Match Exp 2) */
 @media (max-width: 768px) {
     .sim-container {
         flex-direction: column;
+        height: 100%;
         overflow: hidden;
-        height: 100dvh;
     }
     
     .canvas-area {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
+        height: 55%;
         width: 100%;
-        z-index: 10;
+        position: relative;
+        flex: none;
+        background: radial-gradient(circle at center, #1e293b 0%, #000 100%);
     }
-    
+
     .controls-panel {
-        position: absolute;
-        bottom: 0;
-        left: 0;
         width: 100%;
-        height: 60%;
-        max-height: 80vh;
-        z-index: 50;
-        border-radius: 20px 20px 0 0;
-        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-        transform: translateY(0);
+        height: 45%;
+        max-height: none;
+        border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.1);
         display: flex;
         flex-direction: column;
         background: rgba(10, 10, 15, 0.95);
-        border-top: 1px solid rgba(255,255,255,0.15);
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        transform: none !important; /* Reset drawer transforms */
+        position: static;
     }
 
     .controls-panel.collapsed {
-        /* On mobile, we show Top Stopwatch + Header. 
-           Stopwatch (~120px) + Header (60px) = 180px approx.
-           Let's use a fixed offset.
-        */
-        transform: translateY(calc(100% - 180px)); 
+        height: 0;
+        width: 100%;
+        overflow: hidden;
     }
 
     .top-stopwatch {
-        padding: 1rem 1.5rem;
+        padding: 1rem;
         background: rgba(0, 0, 0, 0.2);
     }
 
     .header {
-        cursor: pointer;
         padding: 0.8rem 1.5rem;
-        position: relative;
-        background: rgba(10, 10, 15, 0.6);
-        border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     
     .mobile-drag-handle {
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: rgba(255,255,255,0.2);
-        border-radius: 2px;
+        display: none; /* No dragging in split view */
     }
 
-    .main-actions {
-        margin-left: auto;
-    }
-    
     .scroll-content {
         padding: 1.5rem;
-        overflow-y: auto;
-        flex: 1;
+        padding-bottom: 2rem;
     }
+}
+
+/* Graph Overlay Styles */
+.graph-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 15;
+    pointer-events: none; /* Let clicks pass through to canvas if needed, or maybe capture for tooltip? */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.graph-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: -1;
 }
 </style>

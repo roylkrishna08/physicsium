@@ -265,6 +265,6 @@ onUnmounted(() => {
     height: 100vh;
     z-index: -1;
     pointer-events: none;
-    background: radial-gradient(circle at center, #1a2035 0%, #0f1218 100%);
+    background: radial-gradient(circle at center, #0a0614 0%, #000 100%);
 }
 </style>
