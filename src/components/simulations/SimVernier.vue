@@ -11,10 +11,13 @@ const MIN_POS = 0
 // --- State ---
 const sliderX = ref(0) 
 const isDragging = ref(false)
-const dragMode = ref('slide') // 'slide', 'pan', or 'object'
+const isDragging = ref(false)
+const dragMode = ref('slide') // 'slide', 'pan', 'object', 'magnifier'
 const svgRef = ref(null)
 let dragStartX = 0
 let dragStartY = 0
+let magDragOffsetX = 0
+let magDragOffsetY = 0
 let initialSliderX = 0
 let initialPanX = 0
 let initialPanY = 0
@@ -274,23 +277,14 @@ const highlightX = computed(() => {
 const mouseX = ref(0)
 const mouseY = ref(0) // In SVG Coordinates relative to viewBox
 
-const updateMouse = (e) => {
-    // Zoom/Pinch Guard: If zooming, don't move magnifier
-    if (isZooming.value) return 
-
-    // SVG Coordinate mapping
-    if (svgRef.value) {
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY
-        
-        const point = svgRef.value.createSVGPoint()
-        point.x = clientX
-        point.y = clientY
-        const svgPoint = point.matrixTransform(svgRef.value.getScreenCTM().inverse())
-        mouseX.value = svgPoint.x
-        mouseY.value = svgPoint.y
+// Initialize position to center of viewbox if 0
+watch(showMagnifier, (val) => {
+    if (val && !mouseX.value && !mouseY.value) {
+        // Default center roughly
+        mouseX.value = 500
+        mouseY.value = 175
     }
-}
+})
 
 const lensTransform = computed(() => {
     // Scale 2x around the mouse point
@@ -323,6 +317,24 @@ const startDrag = (e) => {
     
     const svgPoint = getSVGPoint(clientX, clientY)
     
+    // Check Magnifier Hit
+    if (showMagnifier.value) {
+        // Distance check
+        const dist = Math.sqrt((svgPoint.x - mouseX.value)**2 + (svgPoint.y - mouseY.value)**2)
+        if (dist < 75) {
+            dragMode.value = 'magnifier'
+            magDragOffsetX = svgPoint.x - mouseX.value
+            magDragOffsetY = svgPoint.y - mouseY.value
+            
+            window.addEventListener('mousemove', onDrag)
+            window.addEventListener('mouseup', stopDrag)
+            window.addEventListener('touchmove', onDrag, { passive: false })
+            window.addEventListener('touchend', stopDrag)
+            e.preventDefault()
+            return
+        }
+    }
+
     if (isObject) {
         dragMode.value = 'object'
         const objId = parseInt(isObject.dataset.id)
@@ -386,6 +398,9 @@ const onDrag = (e) => {
             obj.x = currentPoint.x - objectDragStartX
             obj.y = currentPoint.y - objectDragStartY
         }
+    } else if (dragMode.value === 'magnifier') {
+        mouseX.value = currentPoint.x - magDragOffsetX
+        mouseY.value = currentPoint.y - magDragOffsetY
     } else {
         const deltaX = currentPoint.x - dragStartX
         const deltaY = currentPoint.y - dragStartY
@@ -422,8 +437,6 @@ const startTutorial = () => tutorialStep.value = 1 // 0 is off
                 class="vernier-svg"
                 @mousedown="startDrag"
                 @touchstart.prevent="startDrag"
-                @mousemove="updateMouse"
-                @touchmove="updateMouse"
                 :class="{ 
                     grabbing: isDragging,
                     'can-pan': zoomLevel > 1 && dragMode === 'pan'

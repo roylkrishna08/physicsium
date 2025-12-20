@@ -26,8 +26,11 @@ let angularVelocity = 0
 // Drag State
 const isDragging = ref(false)
 const dragId = ref(null) // weight ID
+const dragMode = ref('weight') // 'weight' or 'magnifier'
 let dragStartPos = 0 // cm
 let dragStartX = 0 // pixels
+let magDragStartX = 0
+let magDragStartY = 0
 
 // Tool State
 const showMagnifier = ref(false)
@@ -39,25 +42,12 @@ const zoomLevel = ref(1)
 const panX = ref(0)
 const panY = ref(0)
 
-usePinchZoom(containerRef, {
-    onPinch: ({ deltaScale }) => {
-        zoomLevel.value = Math.max(0.5, Math.min(zoomLevel.value * deltaScale, 3))
-    },
-    onPan: ({ deltaX, deltaY }) => {
-        panX.value += deltaX / zoomLevel.value
-        panY.value += deltaY / zoomLevel.value
-    }
-})
-
-// Access internal state if needed (though usePinchZoom as implemented in step 38 returns { isZooming })
-// Wait, I need to check if I captured the return value in step 60?
-// In step 60 I did NOT capture the return value.
-// I need to assign it.
 const { isZooming } = usePinchZoom(containerRef, {
     onPinch: ({ deltaScale }) => {
         zoomLevel.value = Math.max(0.5, Math.min(zoomLevel.value * deltaScale, 3))
     },
     onPan: ({ deltaX, deltaY }) => {
+        if (isDragging.value && dragMode.value === 'magnifier') return
         panX.value += deltaX / zoomLevel.value
         panY.value += deltaY / zoomLevel.value
     }
@@ -436,9 +426,21 @@ const getEventPos = (e) => {
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     return {
         x: clientX - rect.left,
+        x: clientX - rect.left,
         y: clientY - rect.top
     }
 }
+
+// Watch magnifier toggle to center it initially
+watch(showMagnifier, (val) => {
+    if (val && canvasRef.value) {
+        // Only if not already set to something valid
+        if (mousePos.value.x === 0 && mousePos.value.y === 0) {
+            const rect = canvasRef.value.getBoundingClientRect()
+            mousePos.value = { x: rect.width / 2, y: rect.height / 2 }
+        }
+    }
+})
 
 const handleStart = (e) => {
     // Ignore pinch start or active zoom
@@ -447,6 +449,20 @@ const handleStart = (e) => {
     e.preventDefault() // Prevent scroll on touch
     const { x, y } = getEventPos(e)
     
+    // Check Magnifier Hit first (if visible)
+    if (showMagnifier.value) {
+        const mx = mousePos.value.x
+        const my = mousePos.value.y
+        const dist = Math.sqrt((x - mx) ** 2 + (y - my) ** 2)
+        if (dist < 80) { // Radius 80
+            isDragging.value = true
+            dragMode.value = 'magnifier'
+            magDragStartX = x - mx
+            magDragStartY = y - my
+            return
+        }
+    }
+
     // Transform Screen to World
     const cx = width / 2
     const cy = height / 2
@@ -492,6 +508,7 @@ const handleStart = (e) => {
         if (Math.abs(worldX - wVisualX) < 55 && worldY > cy - 20 && worldY < cy + 180) {
             isDragging.value = true
             dragId.value = w.id
+            dragMode.value = 'weight'
             // We store drag START visual pos.
             // On Move, we calculate Delta World X.
             dragStartX = worldX
@@ -503,17 +520,7 @@ const handleStart = (e) => {
 
 const handleMove = (e) => {
     const { x, y } = getEventPos(e)
-    mousePos.value = { x, y } // Keep mousePos in screen coords for Magnifier (it renders in screen space overlay?)
-    // Actually, Magnifier in draw() uses mousePos. 
-    // If I check draw(), Magnifier is drawn AFTER the main scene.
-    // BUT the Magnifier code uses `drawScene(ctx, width, height, true)`.
-    // And inside drawScene, we assume standard transforms.
-    // If I want Magnifier to work, it should probably magnify what's under the cursor on SCREEN.
-    // Currently `draw()` calls `drawScene` with Magnifier transform.
-    // Wait, the magnifier part of `draw()` implements its own clipping and transform.
-    // That implementation assumes `drawScene` draws relative to (width, height).
-    // If `drawScene` applies zoom, the magnifier will magnify the zoomed scene?
-    // Probably yes.
+    const { x, y } = getEventPos(e)
     
     // If zooming active, abort drag
     if (isZooming.value) {
@@ -522,26 +529,36 @@ const handleMove = (e) => {
         return
     }
 
-    if (!isDragging.value || !dragId.value) return
+    if (!isDragging.value) return
     
-    // Convert current X to World X using same logic as handleStart
-    const cx = width / 2
-    const worldX = ((x - cx) / zoomLevel.value) - panX.value + cx
-    
-    const dx = worldX - dragStartX
-    const pxPerCm = width / 120
-    
-    // Convert px delta to cm delta
-    const dPos = dx / pxPerCm
-    
-    // Update position
-    const weight = weights.value.find(w => w.id === dragId.value)
-    if (weight) {
-        let newPos = dragStartPos + dPos
-        // Clamp
-        newPos = Math.max(0, Math.min(100, newPos))
-        weight.pos = Math.round(newPos * 2) / 2 // Snap to 0.5cm
-        updatePhysics()
+    if (dragMode.value === 'magnifier') {
+        mousePos.value = {
+            x: x - magDragStartX,
+            y: y - magDragStartY
+        }
+        return
+    }
+
+    if (dragMode.value === 'weight' && dragId.value) {
+        // Convert current X to World X using same logic as handleStart
+        const cx = width / 2
+        const worldX = ((x - cx) / zoomLevel.value) - panX.value + cx
+        
+        const dx = worldX - dragStartX
+        const pxPerCm = width / 120
+        
+        // Convert px delta to cm delta
+        const dPos = dx / pxPerCm
+        
+        // Update position
+        const weight = weights.value.find(w => w.id === dragId.value)
+        if (weight) {
+            let newPos = dragStartPos + dPos
+            // Clamp
+            newPos = Math.max(0, Math.min(100, newPos))
+            weight.pos = Math.round(newPos * 2) / 2 // Snap to 0.5cm
+            updatePhysics()
+        }
     }
 }
 

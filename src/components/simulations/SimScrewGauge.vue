@@ -62,6 +62,8 @@ let initialPanX = 0
 let initialPanY = 0
 let objectDragStartX = 0
 let objectDragStartY = 0
+let magDragOffsetX = 0
+let magDragOffsetY = 0
 let initialMeasurement = 0
 
 // --- Computed Properties ---
@@ -186,6 +188,22 @@ const startDrag = (e) => {
     
     const svgPoint = getSVGPoint(clientX, clientY)
     
+    // Magnifier Hit Test
+    if (showMagnifier.value) {
+        const dist = Math.sqrt((svgPoint.x - mouseX.value)**2 + (svgPoint.y - mouseY.value)**2)
+        if (dist < 80) { // Radius 80 (75 + rim)
+            dragMode.value = 'magnifier'
+            magDragOffsetX = svgPoint.x - mouseX.value
+            magDragOffsetY = svgPoint.y - mouseY.value
+            
+            window.addEventListener('mousemove', onDrag)
+            window.addEventListener('mouseup', stopDrag)
+            window.addEventListener('touchmove', onDrag, { passive: false })
+            window.addEventListener('touchend', stopDrag)
+            return
+        }
+    }
+
     if (isObject) {
         dragMode.value = 'object'
         const objId = parseInt(isObject.dataset.id)
@@ -255,19 +273,24 @@ const onDrag = (e) => {
         
         panX.value = initialPanX - deltaX
         panY.value = initialPanY - deltaY
+    } else if (dragMode.value === 'magnifier') {
+        const currentPoint = getSVGPoint(clientX, clientY)
+        mouseX.value = currentPoint.x - magDragOffsetX
+        mouseY.value = currentPoint.y - magDragOffsetY
     }
     
     
     if (e.cancelable) e.preventDefault()
 }
 
-const updateMouse = (e) => {
-    if (!showMagnifier.value) return
-    // We need SVG coordinates for the magnifier position
-    const pt = getSVGPoint(e.clientX, e.clientY)
-    mouseX.value = pt.x
-    mouseY.value = pt.y
-}
+// Initialize Magnifier Position Check
+watch(showMagnifier, (val) => {
+    if (val && !mouseX.value && !mouseY.value) {
+        // Default center
+        mouseX.value = 400
+        mouseY.value = 200
+    }
+})
 
 // --- SVG Helpers ---
 const mainScaleTicks = computed(() => {
@@ -332,7 +355,7 @@ const thimbleTicks = computed(() => {
             class="screw-gauge-svg"
             @mousedown="startDrag"
             @touchstart.prevent="startDrag"
-            @mousemove="updateMouse"
+            @mousemove="null"
             :class="{ grabbing: isDragging }"
         >
           <defs>
