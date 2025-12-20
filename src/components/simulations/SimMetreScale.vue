@@ -426,7 +426,6 @@ const getEventPos = (e) => {
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     return {
         x: clientX - rect.left,
-        x: clientX - rect.left,
         y: clientY - rect.top
     }
 }
@@ -524,7 +523,6 @@ const handleStart = (e) => {
 
 const handleMove = (e) => {
     const { x, y } = getEventPos(e)
-    const { x, y } = getEventPos(e)
     
     // If zooming active, abort drag
     if (isZooming.value) {
@@ -584,7 +582,6 @@ const handleEnd = () => {
     
     <aside class="controls-panel glass-panel" :class="{ 'collapsed': isPanelCollapsed }">
         <div class="header">
-            <h3>Principle of Moments</h3>
             <h3>Principle of Moments</h3>
             <div class="main-actions" style="gap: 10px;">
                 <button class="tool-btn" @click="showMagnifier = !showMagnifier" :class="{ active: showMagnifier }">

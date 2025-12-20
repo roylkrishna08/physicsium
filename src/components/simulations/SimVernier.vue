@@ -11,7 +11,6 @@ const MIN_POS = 0
 // --- State ---
 const sliderX = ref(0) 
 const isDragging = ref(false)
-const isDragging = ref(false)
 const dragMode = ref('slide') // 'slide', 'pan', 'object', 'magnifier'
 const svgRef = ref(null)
 let dragStartX = 0
