@@ -2,6 +2,9 @@
 import { computed } from 'vue'
 import { jeeSyllabus } from '../data/jee-syllabus.js'
 import { neetSyllabus } from '../data/neet-syllabus.js'
+import { useSearch } from '../composables/useSearch.js' // Import useSearch
+
+const { searchQuery } = useSearch()
 
 const props = defineProps({
   activeExam: {
@@ -12,6 +15,16 @@ const props = defineProps({
 
 const currentSyllabus = computed(() => {
   return props.activeExam === 'NEET' ? neetSyllabus : jeeSyllabus
+})
+
+const filteredSyllabus = computed(() => {
+    if (!searchQuery.value) return currentSyllabus.value
+    const query = searchQuery.value.toLowerCase()
+    return currentSyllabus.value.filter(unit => 
+        unit.title.toLowerCase().includes(query) ||
+        unit.unit.toLowerCase().includes(query) ||
+        unit.content.toLowerCase().includes(query)
+    )
 })
 
 const title = computed(() => {
@@ -27,8 +40,8 @@ const title = computed(() => {
     </header>
 
     <div class="syllabus-content">
-      <div class="units-list">
-        <div v-for="(unit, index) in currentSyllabus" :key="index" class="unit-card glass-card">
+      <div class="units-list" v-if="filteredSyllabus.length > 0">
+        <div v-for="(unit, index) in filteredSyllabus" :key="index" class="unit-card glass-card">
           <div class="unit-header">
             <span class="unit-number">{{ unit.unit }}</span>
             <h2 class="unit-title">{{ unit.title }}</h2>
@@ -37,6 +50,10 @@ const title = computed(() => {
             <p>{{ unit.content }}</p>
           </div>
         </div>
+      </div>
+      
+      <div v-else class="no-results">
+        <p>No units found matching "{{ searchQuery }}"</p>
       </div>
     </div>
   </div>
@@ -159,5 +176,15 @@ const title = computed(() => {
       font-size: 0.95rem;
       line-height: 1.6;
   }
+}
+
+.no-results {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    margin-top: 2rem;
 }
 </style>

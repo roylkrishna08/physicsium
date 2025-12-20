@@ -1,14 +1,20 @@
 <script setup>
 import { useSearch } from '../composables/useSearch.js'
 import { useRoute } from 'vue-router'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 
 const { searchQuery } = useSearch()
 const isSearchOpen = ref(false)
+const searchInput = ref(null)
 
-const toggleSearch = () => {
+const toggleSearch = async () => {
     isSearchOpen.value = !isSearchOpen.value
-    if (!isSearchOpen.value) searchQuery.value = ''
+    if (!isSearchOpen.value) {
+        searchQuery.value = ''
+    } else {
+        await nextTick()
+        searchInput.value?.focus()
+    }
 }
 
 const props = defineProps({
@@ -40,7 +46,7 @@ const setExam = (exam) => {
   <nav class="navbar glass-card" :class="{ 'search-mode': isSearchOpen }">
     <div class="logo">Physicsium<span class="dot">.</span></div>
     
-    <div class="search-nav">
+    <div class="search-nav" v-if="route.path !== '/'">
         <button class="icon-btn" @click="toggleSearch" aria-label="Search" v-if="!isSearchOpen">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -49,10 +55,10 @@ const setExam = (exam) => {
         </button>
         <div class="search-input-wrapper" v-if="isSearchOpen">
             <input 
+                ref="searchInput"
                 v-model="searchQuery" 
                 class="nav-search-input" 
                 placeholder="Search..."
-                autoFocus
             >
             <button class="icon-btn close-btn" @click="toggleSearch">✕</button>
         </div>
