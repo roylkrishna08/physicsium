@@ -31,7 +31,7 @@ const mouseX = ref(0)
 const mouseY = ref(0)
 
 // --- Pinch Zoom Integration ---
-usePinchZoom(svgRef, {
+const { isZooming } = usePinchZoom(svgRef, {
     onPinch: ({ deltaScale }) => {
         const newZoom = zoomLevel.value * deltaScale
         zoomLevel.value = Math.max(1, Math.min(newZoom, 5))
@@ -173,8 +173,8 @@ const circularReading = computed(() => {
 
 // --- Interaction ---
 const startDrag = (e) => {
-    // Ignore multi-touch
-    if (e.touches && e.touches.length > 1) return
+    // Ignore multi-touch or active zoom
+    if ((e.touches && e.touches.length > 1) || isZooming.value) return
     
     isDragging.value = true
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
@@ -222,7 +222,13 @@ const stopDrag = () => {
 }
 
 const onDrag = (e) => {
-    if (!isDragging.value) return
+    if (isZooming.value) {
+        // Abort drag
+        stopDrag()
+        return
+    }
+
+    if (!isDragging.value || !svgRef.value) return
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     

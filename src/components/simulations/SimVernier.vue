@@ -60,7 +60,7 @@ const isPanelCollapsed = inject('isRightSidebarCollapsed', ref(true))
 const showReading = ref(false)
 
 // --- Pinch Zoom Integration ---
-usePinchZoom(svgRef, {
+const { isZooming } = usePinchZoom(svgRef, {
     onPinch: ({ deltaScale }) => {
         const newZoom = zoomLevel.value * deltaScale
         zoomLevel.value = Math.max(1, Math.min(newZoom, 4))
@@ -304,8 +304,8 @@ const getSVGPoint = (clientX, clientY) => {
 }
 
 const startDrag = (e) => {
-    // Ignore multi-touch (pinch)
-    if (e.touches && e.touches.length > 1) return
+    // Ignore multi-touch (pinch) or active zoom
+    if ((e.touches && e.touches.length > 1) || isZooming.value) return
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
@@ -353,6 +353,12 @@ const stopDrag = () => {
 }
 
 const onDrag = (e) => {
+    if (isZooming.value) {
+        // Abort drag if zooming started
+        isDragging.value = false
+        stopDrag()
+        return
+    }
     if (!isDragging.value || !svgRef.value) return
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY

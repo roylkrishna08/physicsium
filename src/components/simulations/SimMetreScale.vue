@@ -49,6 +49,20 @@ usePinchZoom(containerRef, {
     }
 })
 
+// Access internal state if needed (though usePinchZoom as implemented in step 38 returns { isZooming })
+// Wait, I need to check if I captured the return value in step 60?
+// In step 60 I did NOT capture the return value.
+// I need to assign it.
+const { isZooming } = usePinchZoom(containerRef, {
+    onPinch: ({ deltaScale }) => {
+        zoomLevel.value = Math.max(0.5, Math.min(zoomLevel.value * deltaScale, 3))
+    },
+    onPan: ({ deltaX, deltaY }) => {
+        panX.value += deltaX / zoomLevel.value
+        panY.value += deltaY / zoomLevel.value
+    }
+})
+
 // Canvas Dimensions
 let width = 600
 let height = 400
@@ -427,8 +441,8 @@ const getEventPos = (e) => {
 }
 
 const handleStart = (e) => {
-    // Ignore pinch start
-    if (e.touches && e.touches.length > 1) return
+    // Ignore pinch start or active zoom
+    if ((e.touches && e.touches.length > 1) || isZooming.value) return
 
     e.preventDefault() // Prevent scroll on touch
     const { x, y } = getEventPos(e)
@@ -501,6 +515,13 @@ const handleMove = (e) => {
     // If `drawScene` applies zoom, the magnifier will magnify the zoomed scene?
     // Probably yes.
     
+    // If zooming active, abort drag
+    if (isZooming.value) {
+        isDragging.value = false
+        dragId.value = null
+        return
+    }
+
     if (!isDragging.value || !dragId.value) return
     
     // Convert current X to World X using same logic as handleStart
