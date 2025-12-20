@@ -178,9 +178,15 @@ const startDrag = (e) => {
     // Ignore multi-touch or active zoom
     if ((e.touches && e.touches.length > 1) || isZooming.value) return
     
-    isDragging.value = true
+    // Clear State
+    isDragging.value = false
+    dragMode.value = null
+
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    
+    // Valid touch/click started
+    isDragging.value = true
     
     const target = e.target
     const isScrew = target.closest('.movable-screw') // We'll add this class to screw parts

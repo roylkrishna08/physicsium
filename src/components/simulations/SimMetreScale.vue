@@ -447,6 +447,12 @@ const handleStart = (e) => {
     if ((e.touches && e.touches.length > 1) || isZooming.value) return
 
     e.preventDefault() // Prevent scroll on touch
+    
+    // Reset Drag State
+    isDragging.value = false
+    dragMode.value = null
+    dragId.value = null
+
     const { x, y } = getEventPos(e)
     
     // Check Magnifier Hit first (if visible)
@@ -487,7 +493,6 @@ const handleStart = (e) => {
     
     // Hit Test logic duplicates draw logic transform
     const pxPerCm = width / 120
-    const rulerHeight = 40
     
     // Approximate hit test (ignoring rotation for selection ease, valid for small angles)
     // Scale Center X (where 50cm mark is)
@@ -501,7 +506,6 @@ const handleStart = (e) => {
     
     for (const w of weights.value) {
         const wVisualX = scaleCenterX + (w.pos - 50) * pxPerCm
-        const wVisualY = cy + 20 // Approx top of string
         
         // Simple distance check
         // Wider hit box for easier dragging on touch/mouse

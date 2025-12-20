@@ -305,6 +305,10 @@ const startDrag = (e) => {
     // Ignore multi-touch (pinch) or active zoom
     if ((e.touches && e.touches.length > 1) || isZooming.value) return
 
+    // Clear State
+    isDragging.value = false
+    dragMode.value = null
+
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     
