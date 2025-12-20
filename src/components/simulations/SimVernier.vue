@@ -275,13 +275,17 @@ const mouseX = ref(0)
 const mouseY = ref(0) // In SVG Coordinates relative to viewBox
 
 const updateMouse = (e) => {
-    // Only update if magnifier is active to save resources? 
-    // Or always update for smoothness.
+    // Zoom/Pinch Guard: If zooming, don't move magnifier
+    if (isZooming.value) return 
+
     // SVG Coordinate mapping
     if (svgRef.value) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY
+        
         const point = svgRef.value.createSVGPoint()
-        point.x = e.clientX
-        point.y = e.clientY
+        point.x = clientX
+        point.y = clientY
         const svgPoint = point.matrixTransform(svgRef.value.getScreenCTM().inverse())
         mouseX.value = svgPoint.x
         mouseY.value = svgPoint.y
@@ -419,6 +423,7 @@ const startTutorial = () => tutorialStep.value = 1 // 0 is off
                 @mousedown="startDrag"
                 @touchstart.prevent="startDrag"
                 @mousemove="updateMouse"
+                @touchmove="updateMouse"
                 :class="{ 
                     grabbing: isDragging,
                     'can-pan': zoomLevel > 1 && dragMode === 'pan'
