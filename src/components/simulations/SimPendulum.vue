@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue'
+import { usePinchZoom } from '../../composables/usePinchZoom'
 
 const canvasRef = ref(null)
 const animationId = ref(null)
@@ -32,6 +33,23 @@ let stopwatchInterval = null
 const showGraph = ref(false)
 const graphData = ref([])
 let prevOmega = 0
+
+const containerRef = ref(null)
+
+// --- Zoom State ---
+const zoomLevel = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+
+usePinchZoom(containerRef, {
+    onPinch: ({ deltaScale }) => {
+        zoomLevel.value = Math.max(0.5, Math.min(zoomLevel.value * deltaScale, 3))
+    },
+    onPan: ({ deltaX, deltaY }) => {
+        panX.value += deltaX / zoomLevel.value
+        panY.value += deltaY / zoomLevel.value
+    }
+})
 
 // Canvas dimensions
 let width = 600
@@ -92,6 +110,14 @@ const draw = () => {
     // Clear
     ctx.clearRect(0, 0, width, height)
     
+    ctx.save()
+    // Global Camera Transform
+    const cx = width / 2
+    const cy = height / 2
+    ctx.translate(cx + panX.value * zoomLevel.value, cy + panY.value * zoomLevel.value)
+    ctx.scale(zoomLevel.value, zoomLevel.value)
+    ctx.translate(-cx, -cy)
+
     // Draw Grid (Technical Background)
     ctx.save()
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
@@ -172,6 +198,8 @@ const draw = () => {
     if (showTrace.value) {
         // Implementation for trace would go here
     }
+    
+    ctx.restore() // Pop Camera
 }
 
 

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { usePinchZoom } from '../../composables/usePinchZoom'
 
 // --- Constants ---
 const PIXELS_PER_MM = 5
@@ -57,6 +58,20 @@ const isPanelCollapsed = inject('isRightSidebarCollapsed', ref(true))
 
 // Reading Visibility
 const showReading = ref(false)
+
+// --- Pinch Zoom Integration ---
+usePinchZoom(svgRef, {
+    onPinch: ({ deltaScale }) => {
+        const newZoom = zoomLevel.value * deltaScale
+        zoomLevel.value = Math.max(1, Math.min(newZoom, 4))
+    },
+    onPan: ({ deltaX, deltaY }) => {
+        // Dragging right (positive delta) -> Move ViewBox left (negative pan)
+        // Divide by zoomLevel to keep panning consistent with screen movement
+        panX.value -= deltaX / zoomLevel.value
+        panY.value -= deltaY / zoomLevel.value
+    }
+})
 
 // --- Zoom Logic ---
 const zoomLevel = ref(1)
@@ -289,6 +304,9 @@ const getSVGPoint = (clientX, clientY) => {
 }
 
 const startDrag = (e) => {
+    // Ignore multi-touch (pinch)
+    if (e.touches && e.touches.length > 1) return
+
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     

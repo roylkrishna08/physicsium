@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
+import { usePinchZoom } from '../../composables/usePinchZoom'
 
 // --- Constants ---
 const PIXELS_PER_MM = 10 // Magnified for detail
@@ -28,6 +29,18 @@ const divisionCount = ref(100) // 100 or 50
 const showMagnifier = ref(false)
 const mouseX = ref(0)
 const mouseY = ref(0)
+
+// --- Pinch Zoom Integration ---
+usePinchZoom(svgRef, {
+    onPinch: ({ deltaScale }) => {
+        const newZoom = zoomLevel.value * deltaScale
+        zoomLevel.value = Math.max(1, Math.min(newZoom, 5))
+    },
+    onPan: ({ deltaX, deltaY }) => {
+        panX.value -= deltaX / zoomLevel.value
+        panY.value -= deltaY / zoomLevel.value
+    }
+})
 
 const LC = computed(() => PITCH / divisionCount.value)
 
@@ -160,6 +173,9 @@ const circularReading = computed(() => {
 
 // --- Interaction ---
 const startDrag = (e) => {
+    // Ignore multi-touch
+    if (e.touches && e.touches.length > 1) return
+    
     isDragging.value = true
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY

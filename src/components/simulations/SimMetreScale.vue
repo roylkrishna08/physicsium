@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed, inject } from 'vue'
+import { usePinchZoom } from '../../composables/usePinchZoom'
 
 const canvasRef = ref(null)
 const animationId = ref(null)
@@ -31,6 +32,22 @@ let dragStartX = 0 // pixels
 // Tool State
 const showMagnifier = ref(false)
 const mousePos = ref({ x: 0, y: 0 })
+const containerRef = ref(null)
+
+// --- Zoom State ---
+const zoomLevel = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+
+usePinchZoom(containerRef, {
+    onPinch: ({ deltaScale }) => {
+        zoomLevel.value = Math.max(0.5, Math.min(zoomLevel.value * deltaScale, 3))
+    },
+    onPan: ({ deltaX, deltaY }) => {
+        panX.value += deltaX / zoomLevel.value
+        panY.value += deltaY / zoomLevel.value
+    }
+})
 
 // Canvas Dimensions
 let width = 600
@@ -299,7 +316,17 @@ const draw = () => {
     // Background Grid - Moved to drawScene
     
     // Draw Main Scene
+    // Draw Main Scene
+    ctx.save()
+    // Global Camera Transform
+    const cx = width / 2
+    const cy = height / 2
+    ctx.translate(cx + panX.value * zoomLevel.value, cy + panY.value * zoomLevel.value)
+    ctx.scale(zoomLevel.value, zoomLevel.value)
+    ctx.translate(-cx, -cy)
+
     drawScene(ctx, width, height, false)
+    ctx.restore()
     
     // Draw Magnifier
     if (showMagnifier.value) {
@@ -400,12 +427,35 @@ const getEventPos = (e) => {
 }
 
 const handleStart = (e) => {
+    // Ignore pinch start
+    if (e.touches && e.touches.length > 1) return
+
     e.preventDefault() // Prevent scroll on touch
     const { x, y } = getEventPos(e)
     
-    // Hit Test logic duplicates draw logic transform
+    // Transform Screen to World
     const cx = width / 2
     const cy = height / 2
+    
+    // Reverse Transform:
+    // Screen = (World - Center) * Zoom + Center + Pan*Zoom
+    // World - Center = (Screen - Center - Pan*Zoom) / Zoom
+    // World = ((Screen - Center) / Zoom) - Pan + Center
+    
+    // Note: My draw logic used: translate(cx + pan*z, cy + pan*z) -> scale(z) -> translate(-cx, -cy)
+    // Point P_world -> P_screen:
+    // P_screen = (P_world - (cx,cy)) * z + (cx,cy) + (pan*z, pan*z)
+    // Let's verify: P_world at center (cx,cy) -> ends at cx + pan*z. Correct.
+    
+    // Inverse:
+    // P_screen - (cx,cy) - (pan*z, pan*z) = (P_world - (cx,cy)) * z
+    // (P_world - (cx,cy)) = (P_screen - cx - pan*z) / z
+    // P_world = ((P_screen - cx)/z) - pan + cx
+    
+    const worldX = ((x - cx) / zoomLevel.value) - panX.value + cx
+    const worldY = ((y - cy) / zoomLevel.value) - panY.value + cy
+    
+    // Hit Test logic duplicates draw logic transform
     const pxPerCm = width / 120
     const rulerHeight = 40
     
@@ -425,10 +475,12 @@ const handleStart = (e) => {
         
         // Simple distance check
         // Wider hit box for easier dragging on touch/mouse
-        if (Math.abs(x - wVisualX) < 55 && y > cy - 20 && y < cy + 180) {
+        if (Math.abs(worldX - wVisualX) < 55 && worldY > cy - 20 && worldY < cy + 180) {
             isDragging.value = true
             dragId.value = w.id
-            dragStartX = x
+            // We store drag START visual pos.
+            // On Move, we calculate Delta World X.
+            dragStartX = worldX
             dragStartPos = w.pos
             return
         }
@@ -437,11 +489,25 @@ const handleStart = (e) => {
 
 const handleMove = (e) => {
     const { x, y } = getEventPos(e)
-    mousePos.value = { x, y }
+    mousePos.value = { x, y } // Keep mousePos in screen coords for Magnifier (it renders in screen space overlay?)
+    // Actually, Magnifier in draw() uses mousePos. 
+    // If I check draw(), Magnifier is drawn AFTER the main scene.
+    // BUT the Magnifier code uses `drawScene(ctx, width, height, true)`.
+    // And inside drawScene, we assume standard transforms.
+    // If I want Magnifier to work, it should probably magnify what's under the cursor on SCREEN.
+    // Currently `draw()` calls `drawScene` with Magnifier transform.
+    // Wait, the magnifier part of `draw()` implements its own clipping and transform.
+    // That implementation assumes `drawScene` draws relative to (width, height).
+    // If `drawScene` applies zoom, the magnifier will magnify the zoomed scene?
+    // Probably yes.
     
     if (!isDragging.value || !dragId.value) return
     
-    const dx = x - dragStartX
+    // Convert current X to World X using same logic as handleStart
+    const cx = width / 2
+    const worldX = ((x - cx) / zoomLevel.value) - panX.value + cx
+    
+    const dx = worldX - dragStartX
     const pxPerCm = width / 120
     
     // Convert px delta to cm delta
