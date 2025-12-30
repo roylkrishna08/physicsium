@@ -110,7 +110,7 @@
     border-radius: 50%;
     transform: translate(-50%, -50%);
     transform-style: preserve-3d;
-    animation: orbit 60s linear infinite reverse;
+    animation: orbit 60s linear infinite;
     box-shadow: 0 0 15px rgba(255,255,255,0.1);
 }
 

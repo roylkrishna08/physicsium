@@ -6,6 +6,8 @@ import TopicCard from '../components/TopicCard.vue'
 import TopicsBackground from '../components/TopicsBackground.vue'
 import { useSearch } from '../composables/useSearch.js'
 
+defineProps(['activeExam'])
+
 // Sort: Experimental Content First, then others
 const sortedTopics = [...jeeSyllabus].sort((a, b) => {
     const isExpA = a.title.toLowerCase().includes('experimental')
@@ -16,6 +18,7 @@ const sortedTopics = [...jeeSyllabus].sort((a, b) => {
 })
 
 const { searchQuery } = useSearch()
+const router = useRouter()
 
 const filteredTopics = computed(() => {
     if (!searchQuery.value) return sortedTopics
@@ -43,6 +46,8 @@ const handleTopicClick = (topic) => {
         router.push('/experiments')
     } else if (title.includes('kinematics')) {
         router.push('/lab/projectile')
+    } else if (title.includes('electrostatics')) {
+        router.push('/electrostatics')
     } else {
         // Placeholder for future modules
         alert(`${topic.title} module is coming soon!`)

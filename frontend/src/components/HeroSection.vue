@@ -21,7 +21,7 @@ import SolarSystem from './SolarSystem.vue'
       </p>
       <div class="hero-actions">
         <router-link to="/topics" class="btn-primary">Start Learning Free</router-link>
-        <button class="btn-outline">Watch Demo</button>
+        <router-link to="/mission-2027" class="btn-outline">Mission 2027</router-link>
       </div>
       
       <div class="stats-row">

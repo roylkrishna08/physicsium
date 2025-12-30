@@ -61,13 +61,13 @@ const formattedIndex = (i) => {
 
 <style scoped>
 .topic-card {
-  padding: 1.5rem;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
   cursor: pointer;
   position: relative;
-  min-height: 240px;
+  min-height: auto; /* Allow natural height on mobile */
 }
 
 .topic-card::before {
@@ -338,6 +338,34 @@ const formattedIndex = (i) => {
 
     .topic-card:not(.compact) .progress-bar {
         display: none; /* Even cleaner */
+    }
+}
+
+@media (max-width: 768px) {
+    .topic-card {
+        text-align: center;
+        padding-top: 3rem; /* Add space for the number at top-left */
+    }
+
+    .card-header {
+        justify-content: center;
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .tags {
+        display: none; /* Hide tags on mobile for cleaner look */
+    }
+    
+    .card-number {
+        /* Ensure number stays left and is visible */
+        left: 1rem;
+        right: auto;
+        top: 0.5rem;
+        font-size: 2.5rem; /* Bigger */
+        opacity: 0.8; /* Much more visible */
+        color: rgba(255, 255, 255, 0.2); /* Brighter */
+        text-shadow: 0 0 10px rgba(0,0,0,0.5); /* Pop against background */
     }
 }
 </style>

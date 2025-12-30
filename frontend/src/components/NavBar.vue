@@ -44,7 +44,7 @@ const setExam = (exam) => {
 
 <template>
   <nav class="navbar glass-card" :class="{ 'search-mode': isSearchOpen }">
-    <div class="logo">Physicsium<span class="dot">.</span></div>
+    <router-link to="/" class="logo">Physicsium<span class="dot">.</span></router-link>
     
     <div class="search-nav" v-if="route.path !== '/'">
         <button class="icon-btn" @click="toggleSearch" aria-label="Search" v-if="!isSearchOpen">
@@ -106,6 +106,7 @@ const setExam = (exam) => {
   font-weight: 700;
   color: #fff;
   letter-spacing: -1px;
+  text-decoration: none; /* Ensure no underline for link */
 }
 
 .dot {

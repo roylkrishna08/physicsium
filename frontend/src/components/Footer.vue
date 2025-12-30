@@ -1,14 +1,13 @@
 <template>
-  <footer class="footer">
+  <footer class="app-footer">
     <div class="container footer-content">
         <div class="brand">
             <h3>Physicsium</h3>
             <p>Empowering the next generation of scientists and engineers.</p>
         </div>
         <div class="links">
-            <a href="#">About</a>
-            <a href="#">Syllabus</a>
-            <a href="#">Privacy</a>
+            <a href="#">Terms</a>
+            <router-link to="/privacy-policy">Privacy Policy</router-link>
             <a href="#">Contact</a>
         </div>
         <div class="copy">
@@ -19,7 +18,7 @@
 </template>
 
 <style scoped>
-.footer {
+.app-footer {
     background: var(--bg-surface);
     padding: 3rem 0;
     margin-top: 4rem;
