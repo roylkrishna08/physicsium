@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import ElectrostaticsBackground from '../../components/ElectrostaticsBackground.vue'
-import TopicCard from '../../components/TopicCard.vue'
+import ElectrostaticsBackground from '../../../components/backgrounds/ElectrostaticsBackground.vue'
+import TopicCard from '../../../components/ui/TopicCard.vue'
 
 defineProps(['activeExam'])
 
@@ -85,7 +85,7 @@ const navigateTo = (route) => {
 .electrostatics-page {
   position: relative;
   min-height: 100vh;
-  padding-top: 6rem;
+  padding-top: 8rem;
   padding-bottom: 4rem;
   overflow: hidden;
   perspective: 1000px;

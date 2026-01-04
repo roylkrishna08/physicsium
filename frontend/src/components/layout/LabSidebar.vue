@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { jeeSyllabus } from '../data/jee-syllabus.js'
+import { jeeSyllabus } from '../../data/jee-syllabus.js'
 
 const props = defineProps({
   activeId: String,

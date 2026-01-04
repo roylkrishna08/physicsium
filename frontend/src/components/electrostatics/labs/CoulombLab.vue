@@ -2,45 +2,118 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 
 const props = defineProps({
-  topicId: String
+  showFormula: {
+    type: Boolean,
+    default: false
+  },
+  showGrid: {
+    type: Boolean,
+    default: true
+  },
+  zoom: {
+    type: Number,
+    default: 1
+  }
 })
 
 const canvasRef = ref(null)
 const width = ref(800)
 const height = ref(600)
 
-// State
-const charges = ref([]) // { x, y, q, fixed: boolean }
-const isDragging = ref(false)
-const draggedIndex = ref(null)
-const showValues = ref(false)
-const showGrid = ref(false)
-const message = ref('') // Feedback message
-
 // Physics Constants
-const k = 9000 
-const gridSpacing = 50 // 1 unit visually
+const K = 9e9 // 9 x 10^9
+const UNIT_Q = 1e-6 // 1 microColoumb
+const PIXELS_PER_METER = 200 // 200px = 1m
+
+// State - stored as offsets from center (dx, dy)
+const charges = ref([
+    { x: -50, y: 0, q: 2, dragging: false },
+    { x: 350, y: 0, q: -2, dragging: false }
+])
+const isDragging = ref(false)
+
+// Calculated Values
+const distance = computed(() => {
+    // Distance calculation works with offsets same as absolute pixels
+    const dx = charges.value[1].x - charges.value[0].x
+    const dy = charges.value[1].y - charges.value[0].y
+    return Math.sqrt(dx*dx + dy*dy)
+})
+
+const forceValue = computed(() => {
+    const r = distance.value / PIXELS_PER_METER
+    if (r < 0.05) return 0 // Singularity protection
+    const q1 = Math.abs(charges.value[0].q) * UNIT_Q
+    const q2 = Math.abs(charges.value[1].q) * UNIT_Q
+    return (K * q1 * q2) / (r * r)
+})
+
+onMounted(() => {
+    if (canvasRef.value) {
+        // Initial setup
+        let rect = canvasRef.value.getBoundingClientRect()
+        width.value = rect.width
+        height.value = rect.height
+        
+        canvasRef.value.width = width.value
+        canvasRef.value.height = height.value
+
+        const resizeObserver = new ResizeObserver(() => {
+             if (canvasRef.value) {
+                const newRect = canvasRef.value.getBoundingClientRect()
+                width.value = newRect.width
+                height.value = newRect.height
+                
+                canvasRef.value.width = width.value
+                canvasRef.value.height = height.value
+                animate()
+             }
+        })
+        resizeObserver.observe(canvasRef.value)
+        
+        animate()
+        return () => resizeObserver.disconnect()
+    }
+})
 
 // --- Interaction Logic ---
+// Mouse pos needs to be relative to center
 const getMousePos = (e) => {
     const rect = canvasRef.value.getBoundingClientRect()
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-    }
+    
+    // Position within canvas (top-left origin)
+    const xCanvas = clientX - rect.left
+    const yCanvas = clientY - rect.top
+    
+    const cx = width.value / 2
+    const cy = height.value / 2
+    
+    // Zoom transform:
+    // ViewX = (WorldX * Zoom) + CX
+    // WorldX = (ViewX - CX) / Zoom
+    
+    // Here WorldX is our relative offset
+    // But wait, our drawing logic will be:
+    // translate(cx, cy) -> scale(zoom) -> draw(x, y)
+    // Screen = (x * zoom) + cx
+    // x = (Screen - cx) / zoom
+    
+    const x = (xCanvas - cx) / props.zoom
+    const y = (yCanvas - cy) / props.zoom
+    
+    return { x, y }
 }
 
 const handleStart = (e) => {
     const { x, y } = getMousePos(e)
-    charges.value.forEach((c, i) => {
-        if (c.fixed) return // Cannot move fixed charges in challenges
+    charges.value.forEach(c => {
         const dx = x - c.x
         const dy = y - c.y
-        if (dx*dx + dy*dy < 900) { 
+        if (dx*dx + dy*dy < 900) { // 30px radius hit (adjust for logic scale)
+            c.dragging = true
             isDragging.value = true
-            draggedIndex.value = i
         }
     })
 }
@@ -48,202 +121,348 @@ const handleStart = (e) => {
 const handleMove = (e) => {
     if (!isDragging.value) return
     const { x, y } = getMousePos(e)
-    if (draggedIndex.value !== null) {
-        charges.value[draggedIndex.value].x = x
-        charges.value[draggedIndex.value].y = y
-        checkChallenge()
-    }
+    
+    charges.value.forEach(c => {
+        if (c.dragging) {
+            c.x = x
+            c.y = y
+        }
+    })
 }
 
 const handleEnd = () => {
     isDragging.value = false
-    draggedIndex.value = null
+    charges.value.forEach(c => c.dragging = false)
 }
 
-const addCharge = (type) => {
-    charges.value.push({
-        x: width.value / 2 + (Math.random() - 0.5) * 100,
-        y: height.value / 2 + (Math.random() - 0.5) * 100,
-        q: type === 'positive' ? 1 : -1,
-        fixed: false
-    })
+const setCharge = (index, val) => {
+    if (charges.value[index]) {
+        charges.value[index].q = val
+    }
 }
 
-// --- Physics Rendering ---
-const calculateField = (x, y, excludeIndex = -1) => {
-    let Ex = 0, Ey = 0
-    charges.value.forEach((c, i) => {
-        if (i === excludeIndex) return
-        const dx = x - c.x
-        const dy = y - c.y
-        const r2 = dx*dx + dy*dy
-        const r = Math.sqrt(r2)
-        if (r < 10) return
-        
-        const E = (k * c.q) / r2
-        Ex += E * (dx / r)
-        Ey += E * (dy / r)
-    })
-    return { Ex, Ey }
+defineExpose({
+    
+    setCharge
+})
+
+// --- Formula Interaction ---
+const formulaPos = ref({ x: 20, y: 20 })
+const formulaScale = ref(1)
+const isFormulaDragging = ref(false)
+const dragStart = ref({ x: 0, y: 0 })
+
+const startFormulaDrag = (e) => {
+    isFormulaDragging.value = true
+    dragStart.value = {
+        x: e.clientX - formulaPos.value.x,
+        y: e.clientY - formulaPos.value.y
+    }
+    window.addEventListener('mousemove', onFormulaDrag)
+    window.addEventListener('mouseup', stopFormulaDrag)
 }
 
+const onFormulaDrag = (e) => {
+    if (!isFormulaDragging.value) return
+    formulaPos.value = {
+        x: e.clientX - dragStart.value.x,
+        y: e.clientY - dragStart.value.y
+    }
+}
+
+const stopFormulaDrag = () => {
+    isFormulaDragging.value = false
+    window.removeEventListener('mousemove', onFormulaDrag)
+    window.removeEventListener('mouseup', stopFormulaDrag)
+}
+
+const handleFormulaZoom = (e) => {
+    const delta = e.deltaY > 0 ? -0.1 : 0.1
+    const newScale = Math.max(0.5, Math.min(3, formulaScale.value + delta))
+    formulaScale.value = newScale
+}
+
+// --- Drawing ---
 const draw = () => {
     const ctx = canvasRef.value?.getContext('2d')
     if (!ctx) return
 
+    // Clear Screen
     ctx.clearRect(0, 0, width.value, height.value)
     
-    // Draw Grid (if enabled)
-    if (showGrid.value || props.topicId === 'coulomb') { // Auto-show grid for challenges
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        for (let x = 0; x <= width.value; x += gridSpacing) {
-            ctx.moveTo(x, 0); ctx.lineTo(x, height.value)
-            // Ruler numbers
-            if(x % 100 === 0) {
-                 ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText((x/gridSpacing).toFixed(0), x+2, 10)
-            }
-        }
-        for (let y = 0; y <= height.value; y += gridSpacing) {
-            ctx.moveTo(0, y); ctx.lineTo(width.value, y)
-        }
-        ctx.stroke()
+    const cx = width.value / 2
+    const cy = height.value / 2
+
+    // Apply Center-Relative Zoom Transform
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(props.zoom, props.zoom)
+    // Do NOT translate back. We want (0,0) to be the center.
+    // Charges are stored as relative offsets.
+    
+    // Grid now needs to be drawn large enough to cover the screen
+    // logic: top-left in world coords is (-cx/zoom, -cy/zoom)
+    if (props.showGrid) {
+        drawGrid(ctx, -cx/props.zoom, -cy/props.zoom, width.value/props.zoom, height.value/props.zoom)
     }
     
-    // Vector Field (Disabled in simple null point mode to reduce noise? No, keep it)
-    for (let x = 0; x <= width.value; x += 40) {
-        for (let y = 0; y <= height.value; y += 40) {
-            const { Ex, Ey } = calculateField(x, y)
-            const E = Math.sqrt(Ex*Ex + Ey*Ey)
-            if (E < 0.1) continue 
-            
-            const maxLen = 30
-            const len = Math.min(E * 10, maxLen)
-            const angle = Math.atan2(Ey, Ex)
-            
-            ctx.save()
-            ctx.translate(x, y)
-            ctx.rotate(angle)
-            ctx.beginPath()
-            ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(E/2, 0.3)})`
-            ctx.moveTo(-len/2, 0); ctx.lineTo(len/2, 0)
-            ctx.stroke()
-            ctx.restore()
-        }
-    }
+    // Draw everything else
+    // ... drawing functions access charges which are already offsets ...
     
-    // Charges
-    charges.value.forEach((c, i) => {
-        ctx.beginPath()
-        ctx.arc(c.x, c.y, 18, 0, Math.PI * 2)
-        ctx.fillStyle = c.q > 0 ? '#ff0055' : '#00d4ff'
-        if (c.fixed) ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
+    drawDistance(ctx)
+    charges.value.forEach(drawCharge)
+    drawForces(ctx)
+
+    ctx.restore()
+}
+
+const drawGrid = (ctx, minX, minY, w, h) => {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
+    ctx.lineWidth = 1
+    const gridSize = 50
+    
+    // Calculate start/end based on view bounds
+    // Align to grid size
+    const startX = Math.floor(minX / gridSize) * gridSize
+    const startY = Math.floor(minY / gridSize) * gridSize
+    const endX = minX + w
+    const endY = minY + h
+    
+    ctx.beginPath()
+    for (let x = startX; x <= endX; x += gridSize) {
+        ctx.moveTo(x, minY); ctx.lineTo(x, endY)
+    }
+    for (let y = startY; y <= endY; y += gridSize) {
+        ctx.moveTo(minX, y); ctx.lineTo(endX, y)
+    }
+    ctx.stroke()
+    
+    // Draw Axes (optional)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(minX, 0); ctx.lineTo(endX, 0) // X-axis
+    ctx.moveTo(0, minY); ctx.lineTo(0, endY) // Y-axis
+    ctx.stroke()
+}
+
+const drawDistance = (ctx) => {
+    const c1 = charges.value[0]
+    const c2 = charges.value[1]
+    
+    ctx.beginPath()
+    ctx.setLineDash([5, 5])
+    ctx.moveTo(c1.x, c1.y)
+    ctx.lineTo(c2.x, c2.y)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.setLineDash([])
+    
+    // Distance Label
+    const midX = (c1.x + c2.x) / 2
+    const midY = (c1.y + c2.y) / 2
+    const rMeters = distance.value / PIXELS_PER_METER
+    
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 16px "Segoe UI", sans-serif'
+    ctx.textAlign = 'center'
+    // Add background for calc
+    const text = `${rMeters.toFixed(2)} m`
+    const metrics = ctx.measureText(text)
+    
+    const labelYOffset = -45 // Move higher to avoid force overlap
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'
+    ctx.fillRect(midX - metrics.width/2 - 6, midY + labelYOffset - 14, metrics.width + 12, 22)
+    
+    ctx.fillStyle = '#e2e8f0'
+    ctx.fillText(text, midX, midY + labelYOffset)
+}
+
+const drawCharge = (c) => {
+    const ctx = canvasRef.value?.getContext('2d')
+    if (!ctx) return
+    
+    // Glow
+    const gradient = ctx.createRadialGradient(c.x, c.y, 5, c.x, c.y, 50)
+    if (c.q > 0) {
+        gradient.addColorStop(0, 'rgba(255, 0, 85, 0.6)')
+        gradient.addColorStop(1, 'rgba(255, 0, 85, 0)')
+    } else {
+        gradient.addColorStop(0, 'rgba(0, 212, 255, 0.6)')
+        gradient.addColorStop(1, 'rgba(0, 212, 255, 0)')
+    }
+    ctx.fillStyle = gradient
+    ctx.beginPath(); ctx.arc(c.x, c.y, 50, 0, Math.PI*2); ctx.fill()
+    
+    // Core
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, 20, 0, Math.PI * 2)
+    ctx.fillStyle = c.q > 0 ? '#ff0055' : '#00d4ff'
+    ctx.shadowColor = c.q > 0 ? '#ff0055' : '#00d4ff'
+    ctx.shadowBlur = 15
+    ctx.fill()
+    ctx.shadowBlur = 0
+    
+    // Label
+    ctx.fillStyle = 'white'
+    ctx.font = 'bold 18px Arial'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(c.q > 0 ? `+${c.q}` : c.q, c.x, c.y)
+}
+
+const drawForces = (ctx) => {
+    const c1 = charges.value[0]
+    const c2 = charges.value[1]
+    const r = distance.value
+    if (r < 10) return
+    
+    const dx = c2.x - c1.x
+    const dy = c2.y - c1.y
+    const angle = Math.atan2(dy, dx)
+    
+    const isRepulsive = (c1.q * c2.q) > 0
+    
+    // Magnified scaling: F=0.04N -> 120px
+    const vecLen = Math.min(forceValue.value * 3500, 250) 
+    const arrowStartOffset = 25 // Start outside the sphere
+    
+    const drawVec = (start, dirAngle) => {
+        // Start from edge of sphere
+        const startX = start.x + Math.cos(dirAngle) * arrowStartOffset
+        const startY = start.y + Math.sin(dirAngle) * arrowStartOffset
         
+        const endX = startX + Math.cos(dirAngle) * vecLen
+        const endY = startY + Math.sin(dirAngle) * vecLen
+        
+        ctx.beginPath()
+        ctx.moveTo(startX, startY)
+        ctx.lineTo(endX, endY)
+        ctx.strokeStyle = '#fbbf24' // Amber
+        ctx.lineWidth = 5
+        ctx.lineCap = 'round'
+        ctx.stroke()
+        
+        // Arrowhead
+        const headLen = 15
+        ctx.beginPath()
+        ctx.moveTo(endX, endY)
+        ctx.lineTo(
+            endX - Math.cos(dirAngle - Math.PI/6)*headLen, 
+            endY - Math.sin(dirAngle - Math.PI/6)*headLen
+        )
+        ctx.lineTo(
+            endX - Math.cos(dirAngle + Math.PI/6)*headLen, 
+            endY - Math.sin(dirAngle + Math.PI/6)*headLen
+        )
+        ctx.fillStyle = '#fbbf24'
         ctx.fill()
         
-        ctx.fillStyle = 'white'
-        ctx.font = 'bold 16px Arial'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(c.q > 0 ? `+${Math.abs(c.q)}` : `${c.q}`, c.x, c.y)
-
-        // Show Value Label
-        if (showValues.value) {
-            const { Ex, Ey } = calculateField(c.x, c.y, i)
-            const F = Math.sqrt(Ex*Ex + Ey*Ey) * Math.abs(c.q)
-            ctx.fillStyle = '#fff'
-            ctx.font = '12px monospace'
-            ctx.fillText(`F=${F.toFixed(1)}`, c.x, c.y - 25)
-        }
-    })
-}
-
-// Challenge Logic
-const checkChallenge = () => {
-    message.value = ''
-    if (props.topicId === 'coulomb') {
-        // Null Point: User moves the 3rd charge (index 2) usually
-        // But for "Null Point" we just need E=0 at test charge location
-        const testCharge = charges.value.find(c => !c.fixed)
-        if (!testCharge) return
-
-        const { Ex, Ey } = calculateField(testCharge.x, testCharge.y, charges.value.indexOf(testCharge))
-        const E = Math.sqrt(Ex*Ex + Ey*Ey)
+        // Value Layout
+        ctx.textAlign = 'left' // Reset alignment for sequential drawing
+        ctx.textBaseline = 'alphabetic'
+        const expStr = forceValue.value.toExponential(2)
+        const [base, exponent] = expStr.split('e')
         
-        if (E < 0.5) {
-            message.value = "✅ Exact Null Point Found! E ≈ 0"
-        } else if (E < 5) {
-             message.value = "⚠️ Close! Move slightly to minimize Field."
+        // Parts
+        const mantissa = `${base} × 10`
+        const pow = parseInt(exponent).toString() // Remove leading + or 0
+        const unit = ' N'
+
+        // Font settings
+        const mainFont = 'bold 16px "Courier New", monospace'
+        const supFont = 'bold 12px "Courier New", monospace'
+        
+        // Offset text consistently "below" the arrow
+        const textOffset = 25
+        
+        let perpX = Math.cos(dirAngle + Math.PI/2)
+        let perpY = Math.sin(dirAngle + Math.PI/2)
+        
+        if (perpY < 0) { perpX = -perpX; perpY = -perpY }
+        
+        // Starting Position
+        let cursorX = endX - Math.cos(dirAngle)*10 + perpX * textOffset
+        let cursorY = endY - Math.sin(dirAngle)*10 + perpY * textOffset
+        
+        // Adjust starting X slightly to center the whole block visually? 
+        // A bit complex without pre-measuring. Let's just anchor left for now at the calculated point.
+        // Actually, centering would be better.
+        ctx.font = mainFont
+        const w1 = ctx.measureText(mantissa).width
+        const w3 = ctx.measureText(unit).width
+        ctx.font = supFont
+        const w2 = ctx.measureText(pow).width
+        const totalW = w1 + w2 + w3
+        
+        cursorX -= totalW / 2 // Center horizontally relative to anchor point
+        
+        // Helper to draw stroked text
+        const drawPart = (text, font, x, y) => {
+            ctx.font = font
+            ctx.fillStyle = '#fbbf24'
+            ctx.lineWidth = 3
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)'
+            ctx.strokeText(text, x, y)
+            ctx.fillText(text, x, y)
         }
+        
+        // Draw Mantissa
+        drawPart(mantissa, mainFont, cursorX, cursorY)
+        cursorX += w1
+        
+        // Draw Exponent (Superscript)
+        drawPart(pow, supFont, cursorX, cursorY - 6)
+        cursorX += w2
+        
+        // Draw Unit
+        drawPart(unit, mainFont, cursorX, cursorY)
+    }
+    
+    if (isRepulsive) {
+        drawVec(c1, angle + Math.PI)
+        drawVec(c2, angle)
+    } else {
+        drawVec(c1, angle)
+        drawVec(c2, angle + Math.PI)
     }
 }
 
-// Animation
+
+// Animation Loop
 let frameId
 const animate = () => {
     draw()
     frameId = requestAnimationFrame(animate)
 }
 
-// Preset Logic
-const applyPreset = () => {
-    charges.value = []
-    message.value = ''
-    width.value = window.innerWidth
-    height.value = window.innerHeight
-
-    if (props.topicId === 'coulomb') {
-        // Null Point Challenge Setup
-        // +1Q and +4Q separated by distance
-        const cx = width.value / 2
-        const cy = height.value / 2
-        
-        charges.value = [
-            { x: cx - 200, y: cy, q: 1, fixed: true },
-            { x: cx + 200, y: cy, q: 4, fixed: true },
-            { x: cx, y: cy, q: 1, fixed: false } // Test Charge
-        ]
-        message.value = "Challenge: Find the Null Point (E=0) for +1Q and +4Q."
-        showValues.value = true
-        showGrid.value = true
-        
-    } else if (props.topicId === 'superposition') {
-        // Triangle
-        charges.value = [
-            { x: width.value/2, y: height.value/2 - 100, q: 1, fixed: true },
-            { x: width.value/2 - 86, y: height.value/2 + 50, q: 1, fixed: true },
-            { x: width.value/2 + 86, y: height.value/2 + 50, q: 1, fixed: true }
-        ]
-        showValues.value = true
-    } else {
-        // Default Exploration
-        charges.value = [{ x: width.value/2, y: height.value/2, q: 1, fixed: false }]
-    }
-}
-
-watch(() => props.topicId, applyPreset)
-
+// Resize Observer
+const containerRef = ref(null)
 onMounted(() => {
-    // init
-    window.addEventListener('resize', applyPreset)
-    applyPreset()
+    if (containerRef.value) {
+        const resize = () => {
+            width.value = containerRef.value.clientWidth
+            height.value = containerRef.value.clientHeight
+        }
+        window.addEventListener('resize', resize)
+        resize()
+    }
     animate()
 })
 
 onUnmounted(() => {
-    window.removeEventListener('resize', applyPreset)
     cancelAnimationFrame(frameId)
 })
 </script>
 
 <template>
-    <div class="lab-container">
+    <div class="coulomb-lab" ref="containerRef">
         <canvas 
             ref="canvasRef" 
             :width="width" 
-            :height="height" 
-            class="lab-canvas"
+            :height="height"
             @mousedown="handleStart"
             @mousemove="handleMove"
             @mouseup="handleEnd"
@@ -251,118 +470,152 @@ onUnmounted(() => {
             @touchmove.prevent="handleMove"
             @touchend="handleEnd"
         ></canvas>
-
-        <div class="lab-info" v-if="topicId === 'coulomb'">
-            <h2>Null Point Challenge</h2>
-            <p>
-                Two charges (+1, +4) are fixed. 
-                <br>Drag the free charge to where the Net Force is zero.
-                <br><strong>Hint:</strong> For like charges, the null point is between them, closer to the smaller charge.
-            </p>
-            <div class="feedback" v-if="message">{{ message }}</div>
-        </div>
         
-        <div class="lab-info" v-else>
-            <h2 v-if="topicId === 'superposition'">Superposition Principle</h2>
-            <h2 v-else>Electric Forces</h2>
-            <p>Drag charges to explore. Use the grid to measure distances.</p>
-        </div>
-
-        <div class="controls glass-panel">
-            <div class="toggles">
-                <label><input type="checkbox" v-model="showGrid"> Show Grid</label>
-                <label><input type="checkbox" v-model="showValues"> Show Values</label>
+        <!-- Formula Overlay -->
+        <transition name="fade">
+            <div 
+                class="formula-card" 
+                v-if="showFormula"
+                :style="{ 
+                    transform: `translate(${formulaPos.x}px, ${formulaPos.y}px) scale(${formulaScale})`,
+                    cursor: isFormulaDragging ? 'grabbing' : 'grab'
+                }"
+                @mousedown.stop="startFormulaDrag"
+                @wheel.prevent.stop="handleFormulaZoom"
+            >
+                <h3>Coulomb's Law</h3>
+                <div class="equation-display">
+                    <span class="symbol">F</span> = 
+                    <span class="constant">k</span> 
+                    <div class="fraction">
+                        <span class="numerator">|q₁q₂|</span>
+                        <span class="denominator">r²</span>
+                    </div>
+                </div>
+                
+                <div class="calculation-steps">
+                    <div class="step">
+                        <span class="label">k = </span> 9.00 × 10⁹ N⋅m²/C²
+                    </div>
+                    <div class="step">
+                        <span class="label">q₁ = </span> {{ Math.abs(charges[0].q) }} µC
+                    </div>
+                    <div class="step">
+                        <span class="label">q₂ = </span> {{ Math.abs(charges[1].q) }} µC
+                    </div>
+                    <div class="step">
+                        <span class="label">r = </span> {{ (distance/200).toFixed(2) }} m
+                    </div>
+                    <div class="result">
+                        F = {{ forceValue.toExponential(2) }} N
+                    </div>
+                </div>
             </div>
-            
-            <div class="buttons" v-if="topicId !== 'coulomb'">
-                <button class="btn-charge pos" @click="addCharge('positive')">+q</button>
-                <button class="btn-charge neg" @click="addCharge('negative')">-q</button>
-                <button class="btn-clear" @click="charges = []">Clear</button>
-            </div>
-            <div class="buttons" v-else>
-                 <button class="btn-clear" @click="applyPreset">Reset Challenge</button>
-            </div>
-        </div>
+        </transition>
     </div>
 </template>
 
 <style scoped>
-.lab-container {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-}
-.lab-canvas {
-    display: block;
+.coulomb-lab {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
     cursor: grab;
 }
-.lab-canvas:active { cursor: grabbing; }
-
-.lab-info {
-    position: absolute;
-    top: 6rem;
-    right: 2rem;
-    width: 320px;
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(10px);
-    padding: 1.5rem;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.1);
-    color: white;
-    pointer-events: none;
-    user-select: none;
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
-.lab-info h2 { margin-bottom: 0.5rem; color: #00d4ff; }
-.lab-info p { font-size: 0.95rem; line-height: 1.6; color: #94a3b8; }
-.feedback {
-    margin-top: 1rem;
-    padding: 0.8rem;
-    background: rgba(0, 255, 157, 0.1);
-    border-left: 4px solid #00ff9d;
-    color: #00ff9d;
-    font-weight: bold;
+.coulomb-lab:active {
+    cursor: grabbing;
 }
 
-.glass-panel {
+.formula-card {
     position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.05);
+    top: 2rem;
+    left: 2rem;
+    background: rgba(15, 23, 42, 0.85);
     backdrop-filter: blur(12px);
-    padding: 1rem 1.5rem;
-    border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1.5rem;
+    color: white;
+    min-width: 280px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.formula-card h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: #38bdf8;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 0.5rem;
+}
+
+.equation-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-family: 'Times New Roman', serif;
+    margin-bottom: 1.5rem;
+}
+
+.fraction {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    margin-left: 0.5rem;
 }
 
-.toggles {
-    display: flex; gap: 1.5rem;
-    color: #cbd5e1; font-size: 0.9rem;
+.numerator {
+    border-bottom: 1px solid white;
+    padding-bottom: 2px;
 }
-.toggles label { cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
 
-.buttons { display: flex; gap: 1rem; }
-
-.btn-charge {
-    width: 44px; height: 44px;
-    border-radius: 50%; border: none;
-    color: white; font-weight: bold; cursor: pointer;
-    transition: transform 0.2s;
+.constant {
+    color: #fbbf24;
+    margin-right: 4px;
 }
-.btn-charge:hover { transform: scale(1.1); }
-.pos { background: #ff0055; box-shadow: 0 0 10px #ff0055; }
-.neg { background: #00d4ff; box-shadow: 0 0 10px #00d4ff; }
 
-.btn-clear {
-    padding: 0.6rem 1.2rem;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: white; cursor: pointer;
+.calculation-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-family: monospace;
+    font-size: 0.95rem;
+    color: #cbd5e1;
 }
-.btn-clear:hover { background: rgba(255,255,255,0.2); }
+
+.step {
+    display: flex;
+    justify-content: space-between;
+}
+
+.step .label {
+    color: #94a3b8;
+}
+
+.result {
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+    border-top: 1px dashed rgba(255,255,255,0.2);
+    font-weight: bold;
+    color: #fbbf24;
+    font-size: 1.1rem;
+    text-align: right;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
 </style>

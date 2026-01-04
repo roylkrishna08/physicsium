@@ -1,21 +1,21 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
-import NavBar from './components/NavBar.vue'
-import Footer from './components/Footer.vue'
+import NavBar from './components/layout/NavBar.vue'
+import Footer from './components/layout/Footer.vue'
 
 const activeExam = ref('JEE')
 const route = useRoute()
-const isLabMode = computed(() => route.path.includes('/lab'))
+const isLabMode = computed(() => route.path.includes('/lab') || route.path.includes('/freelab'))
 </script>
 
 <template>
   <div class="app-layout">
-    <NavBar v-if="!isLabMode" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
+    <NavBar v-if="!isLabMode && !route.path.includes('/electrostatics/charges')" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
     
     <RouterView :activeExam="activeExam" />
   
-    <Footer v-if="!isLabMode" />
+    <Footer v-if="!isLabMode && !route.path.includes('/electrostatics/charges')" />
   </div>
 </template>
 

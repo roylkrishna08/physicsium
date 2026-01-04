@@ -1,5 +1,5 @@
 <script setup>
-import { useSearch } from '../composables/useSearch.js'
+import { useSearch } from '../../composables/useSearch.js'
 import { useRoute } from 'vue-router'
 import { ref, nextTick } from 'vue'
 
@@ -96,8 +96,10 @@ const setExam = (exam) => {
   margin: 1.5rem auto;
   width: 90%;
   max-width: 1200px;
-  position: sticky;
+  position: absolute; /* Changed from sticky to absolute so it scrolls away */
   top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 100;
 }
 

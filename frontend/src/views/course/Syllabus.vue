@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { jeeSyllabus } from '../data/jee-syllabus.js'
-import { neetSyllabus } from '../data/neet-syllabus.js'
-import { useSearch } from '../composables/useSearch.js' // Import useSearch
+import { jeeSyllabus } from '../../data/jee-syllabus.js'
+import { neetSyllabus } from '../../data/neet-syllabus.js'
+import { useSearch } from '../../composables/useSearch.js' // Import useSearch
 
 const { searchQuery } = useSearch()
 

@@ -1,6 +1,13 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 
+const props = defineProps({
+    controlsOnly: {
+        type: Boolean,
+        default: false
+    }
+})
+
 const shape = ref('line') // line | ring
 const testCharge = ref({ x: 0, y: -150 })
 const vector = ref({ x: 0, y: 0, mag: 0 })
@@ -87,7 +94,17 @@ watch(shape, calculateVector)
 </script>
 
 <template>
-    <div 
+    <!-- Controls Only Mode (for sidebar) -->
+    <div v-if="controlsOnly" class="sidebar-controls">
+        <div class="control-label">Shape:</div>
+        <div class="toggles-vertical">
+            <button :class="{ active: shape === 'line' }" @click="shape = 'line'">Line Charge (λ)</button>
+            <button :class="{ active: shape === 'ring' }" @click="shape = 'ring'">Ring Charge (λ)</button>
+        </div>
+    </div>
+
+    <!-- Full Lab View -->
+    <div v-else
         class="continuous-lab"
         @mousemove="handleMove"
         @touchmove="handleMove"
@@ -152,7 +169,7 @@ watch(shape, calculateVector)
 
 <style scoped>
 .continuous-lab {
-    width: 100%; height: 100vh;
+    width: 100%; height: 100%;
     overflow: hidden;
     position: relative;
     user-select: none;
@@ -165,7 +182,7 @@ watch(shape, calculateVector)
 
 .info-panel {
     position: absolute;
-    top: 6rem; right: 2rem;
+    top: 1rem; right: 2rem;
     width: 320px;
     background: rgba(15, 23, 42, 0.8);
     backdrop-filter: blur(10px);
@@ -185,9 +202,50 @@ watch(shape, calculateVector)
     background: #ff0055; color: white; border-color: #ff0055;
     box-shadow: 0 0 10px #ff0055;
 }
+
+/* Sidebar Controls Styling */
+.sidebar-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.control-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.toggles-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.toggles-vertical button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.toggles-vertical button.active {
+    background: #ff0055;
+    color: white;
+    border-color: #ff0055;
+    box-shadow: 0 0 10px #ff0055;
+}
+
 .hint {
     position: absolute;
-    bottom: 2rem; left: 50%;
+    bottom: 5rem; left: 50%;
     transform: translateX(-50%);
     color: rgba(255,255,255,0.6);
 }

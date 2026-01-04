@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { jeeSyllabus } from '../data/jee-syllabus.js'
-import TopicCard from '../components/TopicCard.vue'
-import LabBackground from '../components/LabBackground.vue'
-import { useSearch } from '../composables/useSearch.js'
+import { jeeSyllabus } from '../../data/jee-syllabus.js'
+import TopicCard from '../../components/ui/TopicCard.vue'
+import LabBackground from '../../components/backgrounds/LabBackground.vue'
+import { useSearch } from '../../composables/useSearch.js'
 
 import { useRouter } from 'vue-router'
 
@@ -17,8 +17,12 @@ const props = defineProps({
 
 // ...
 
-const handleExperimentClick = (id) => {
-    router.push(`/lab/${id}`)
+const handleExperimentClick = (item) => {
+    if (item.route) {
+        router.push(item.route)
+    } else {
+        router.push(`/lab/${item.id}`)
+    }
 }
 
 // Extract Experimental Skills Unit
@@ -32,7 +36,7 @@ const experiments = computed(() => {
     const rawText = experimentUnit.content
     const matches = rawText.split(/\d+\.\s+/)
     
-    return matches
+    const list = matches
         .filter(t => t.trim().length > 0)
         .filter(t => !t.includes('Familiarity with the basic approach')) // Exclude header text
         .map((text, index) => {
@@ -46,6 +50,17 @@ const experiments = computed(() => {
                 unit: 'Experimental Skills'
             }
         })
+
+    // Add Free Lab
+    list.unshift({
+        id: 'freelab',
+        title: 'Free Lab (Multipurpose)',
+        desc: 'Access all physics and chemistry instruments in a free workspace. Create your own experiments.',
+        unit: 'Sandbox',
+        route: '/freelab'
+    })
+
+    return list
 })
 
 const filteredExperiments = computed(() => {
@@ -118,7 +133,7 @@ const getColor = (index) => {
             class="animated-card"
             :style="{ '--i': index }"
             :compact="true"
-            @click="handleExperimentClick(exp.id)"
+            @click="handleExperimentClick(exp)"
           />
       </TransitionGroup>
     </div>

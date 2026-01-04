@@ -1,6 +1,6 @@
 <script setup>
-import HeroSection from '../components/HeroSection.vue'
-import UniverseBg from '../components/UniverseBg.vue'
+import HeroSection from '../../components/home/HeroSection.vue'
+import UniverseBg from '../../components/backgrounds/UniverseBg.vue'
 
 const props = defineProps({
   activeExam: {

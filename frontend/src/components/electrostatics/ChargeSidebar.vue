@@ -4,16 +4,17 @@ import { ref } from 'vue'
 const props = defineProps({
   title: String,
   topics: Array, // [{ id, label }]
-  activeTopic: String
+  activeTopic: String,
+  isOpen: {
+    type: Boolean,
+    default: true
+  }
 })
 
-const emit = defineEmits(['select', 'toggle'])
-
-const isOpen = ref(true)
+const emit = defineEmits(['select', 'update:isOpen'])
 
 const toggle = () => {
-    isOpen.value = !isOpen.value
-    emit('toggle', isOpen.value)
+    emit('update:isOpen', !props.isOpen)
 }
 </script>
 
@@ -43,9 +44,9 @@ const toggle = () => {
 <style scoped>
 .lab-sidebar-container {
     position: absolute;
-    top: 0; 
+    top: 60px; /* Below Navbar */
     left: 0;
-    height: 100vh;
+    height: calc(100vh - 60px);
     width: 320px; /* Slightly wider for comfort */
     background: rgba(15, 23, 42, 0.65); /* More transparent for glass feel */
     backdrop-filter: blur(20px) saturate(180%); /* Premium Frosted Glass */
@@ -53,7 +54,7 @@ const toggle = () => {
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* Smooth spring-like ease */
     z-index: 50;
-    padding-top: 6rem;
+    padding-top: 1rem;
     box-shadow: 10px 0 30px rgba(0,0,0,0.2);
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-import ElectrostaticsBackground from '../../components/ElectrostaticsBackground.vue'
+import ElectrostaticsBackground from '../../../components/backgrounds/ElectrostaticsBackground.vue'
 defineProps(['activeExam'])
 </script>
 
@@ -7,10 +7,10 @@ defineProps(['activeExam'])
   <ElectrostaticsBackground />
   <div class="page-container container">
     <div class="content-wrapper glass-card">
-        <h1>Electric Potential</h1>
-        <p>Potential due to point charge & dipole, equipotential surfaces, electrical potential energy of system of charges.</p>
+        <h1>Gauss's Law</h1>
+        <p>Electric flux, Gauss's law applications: infinite wire, infinite plane sheet, thin spherical shell.</p>
         <div class="placeholder">
-            [Detailed content for Electric Potential will go here]
+            [Detailed content for Gauss's Law will go here]
         </div>
         <router-link to="/electrostatics" class="back-link">← Back to Electrostatics</router-link>
     </div>

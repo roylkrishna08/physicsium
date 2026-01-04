@@ -1,10 +1,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { jeeSyllabus } from '../data/jee-syllabus.js'
-import TopicCard from '../components/TopicCard.vue'
-import TopicsBackground from '../components/TopicsBackground.vue'
-import { useSearch } from '../composables/useSearch.js'
+import { jeeSyllabus } from '../../data/jee-syllabus.js'
+import TopicCard from '../../components/ui/TopicCard.vue'
+import TopicsBackground from '../../components/backgrounds/TopicsBackground.vue'
+import { useSearch } from '../../composables/useSearch.js'
 
 defineProps(['activeExam'])
 
@@ -108,7 +108,7 @@ const isExperimental = (topic) => topic.title.toLowerCase().includes('experiment
 
 <style scoped>
 .topics-page {
-  padding-top: 2rem;
+  padding-top: 8rem;
   padding-bottom: 4rem;
 }
 
