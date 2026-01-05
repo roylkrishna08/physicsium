@@ -24,6 +24,15 @@
       <button class="exit-btn" @click="$emit('exit')">
         ← Exit Lab
       </button>
+
+      <button
+        class="icon-btn"
+        :class="{ active: isDrawingActive }"
+        @click="$emit('toggleDrawing')"
+        :title="isDrawingActive ? 'Hide Drawing Tools' : 'Show Drawing Tools'"
+      >
+        <span>✏️</span>
+      </button>
       
       <button 
         class="hamburger-btn" 
@@ -49,10 +58,14 @@ defineProps({
   isRightSidebarCollapsed: {
     type: Boolean,
     default: false
+  },
+  isDrawingActive: {
+    type: Boolean,
+    default: false
   }
 })
 
-defineEmits(['exit', 'toggleLeftSidebar', 'toggleRightSidebar'])
+defineEmits(['exit', 'toggleLeftSidebar', 'toggleRightSidebar', 'toggleDrawing'])
 </script>
 
 <style scoped>
@@ -155,6 +168,33 @@ defineEmits(['exit', 'toggleLeftSidebar', 'toggleRightSidebar'])
   border-color: var(--primary-glow, #00d4ff);
   color: var(--primary-glow, #00d4ff);
   transform: translateX(-2px);
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.icon-btn.active {
+  background: var(--primary-glow, #00d4ff);
+  border-color: var(--primary-glow, #00d4ff);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
 }
 
 /* Mobile Responsive */

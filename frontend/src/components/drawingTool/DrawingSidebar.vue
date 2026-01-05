@@ -17,10 +17,14 @@ const props = defineProps({
   activeThickness: {
     type: Number,
     default: 3
+  },
+  isShapeSelected: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['update:isOpen', 'update:activeMode', 'update:activeColor', 'update:activeThickness', 'clearAll'])
+const emit = defineEmits(['update:isOpen', 'update:activeMode', 'update:activeColor', 'update:activeThickness', 'clearAll', 'deleteSelected'])
 
 const showShapesMenu = ref(false)
 
@@ -174,6 +178,15 @@ const toggleSidebar = () => {
 
       <!-- Action Footer -->
       <div class="sidebar-footer">
+        <button 
+          v-if="isShapeSelected" 
+          class="clear-btn-icon delete-btn" 
+          @click="emit('deleteSelected')" 
+          title="Delete Selected Shape"
+        >
+          ❌
+        </button>
+        
         <button class="clear-btn-icon" @click="emit('clearAll')" title="Clear Everything">
           🗑️
         </button>
@@ -321,9 +334,11 @@ const toggleSidebar = () => {
 }
 
 .color-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  justify-items: center;
+  width: 100%;
 }
 
 .color-btn {
@@ -341,10 +356,12 @@ const toggleSidebar = () => {
 .thickness-slider {
   writing-mode: bt-lr; /* IE */
   -webkit-appearance: slider-vertical; /* WebKit */
-  width: 8px;
-  height: 80px;
+  width: 20px; /* Slight increase for touch target */
+  height: 100px; /* Make it a bit longer for better control */
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border-radius: 10px;
+  cursor: grab;
+  margin: 0.5rem 0;
 }
 
 .sidebar-footer {
@@ -373,6 +390,18 @@ const toggleSidebar = () => {
   background: #ef4444;
   color: white;
   transform: rotate(15deg);
+}
+
+.delete-btn {
+  margin-bottom: 0.5rem;
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: #fca5a5;
+}
+
+.delete-btn:hover {
+  background: #eab308;
+  transform: scale(1.1);
 }
 
 .toggle-btn {

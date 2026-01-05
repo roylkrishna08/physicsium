@@ -23,12 +23,21 @@ import SimGlassSlab from '../../components/simulations/SimGlassSlab.vue'
 import SimPNJunction from '../../components/simulations/SimPNJunction.vue'
 import SimZenerDiode from '../../components/simulations/SimZenerDiode.vue'
 import SimComponents from '../../components/simulations/SimComponents.vue'
+import DrawingCanvas from '../../components/drawingTool/DrawingCanvas.vue'
+import DrawingSidebar from '../../components/drawingTool/DrawingSidebar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const activeId = computed(() => route.params.id)
 const isLeftSidebarCollapsed = ref(false)
 const isRightSidebarCollapsed = ref(true)
+
+// Drawing State
+const isDrawingOpen = ref(false)
+const drawingMode = ref('pen')
+const drawingColor = ref('#00d4ff')
+const drawingThickness = ref(3)
+const drawingCanvasRef = ref(null)
 
 // Provide right sidebar state to simulation components
 provide('isRightSidebarCollapsed', isRightSidebarCollapsed)
@@ -71,6 +80,25 @@ const toggleLeftSidebar = () => {
 const toggleRightSidebar = () => {
     isRightSidebarCollapsed.value = !isRightSidebarCollapsed.value
 }
+
+const toggleDrawing = () => {
+    isDrawingOpen.value = !isDrawingOpen.value
+}
+
+const clearDrawing = () => {
+    drawingCanvasRef.value?.clearAll()
+}
+
+// Track shape selection state
+const isShapeSelected = ref(false)
+
+const handleShapeSelection = (isSelected) => {
+  isShapeSelected.value = isSelected
+}
+
+const deleteSelectedShape = () => {
+  drawingCanvasRef.value?.deleteSelectedShape()
+}
 </script>
 
 <template>
@@ -82,9 +110,11 @@ const toggleRightSidebar = () => {
       :experimentName="currentTitle"
       :isLeftSidebarCollapsed="isLeftSidebarCollapsed"
       :isRightSidebarCollapsed="isRightSidebarCollapsed"
+      :isDrawingActive="isDrawingOpen"
       @exit="exitLab"
       @toggleLeftSidebar="toggleLeftSidebar"
       @toggleRightSidebar="toggleRightSidebar"
+      @toggleDrawing="toggleDrawing"
     />
     
     <!-- Section 2, 3, 4: Body with sidebars and main area -->
@@ -215,6 +245,26 @@ const toggleRightSidebar = () => {
       <!-- Section 4: Right Controls Sidebar -->
       <!-- This is rendered by the simulation components themselves -->
     </div>
+
+    <!-- Drawing Overlay -->
+    <DrawingCanvas 
+      ref="drawingCanvasRef"
+      :active="isDrawingOpen"
+      :mode="drawingMode"
+      :color="drawingColor"
+      :thickness="drawingThickness"
+      @selectionChanged="handleShapeSelection"
+    />
+
+    <DrawingSidebar
+      v-model:isOpen="isDrawingOpen"
+      v-model:activeMode="drawingMode"
+      v-model:activeColor="drawingColor"
+      v-model:activeThickness="drawingThickness"
+      :isShapeSelected="isShapeSelected"
+      @clearAll="clearDrawing"
+      @deleteSelected="deleteSelectedShape"
+    />
   </div>
 </template>
 
