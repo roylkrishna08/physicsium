@@ -96,10 +96,7 @@ const setExam = (exam) => {
   margin: 1.5rem auto;
   width: 90%;
   max-width: 1200px;
-  position: absolute; /* Changed from sticky to absolute so it scrolls away */
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 100;
 }
 

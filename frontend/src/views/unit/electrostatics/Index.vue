@@ -85,7 +85,7 @@ const navigateTo = (route) => {
 .electrostatics-page {
   position: relative;
   min-height: 100vh;
-  padding-top: 8rem;
+  padding-top: 2rem;
   padding-bottom: 4rem;
   overflow: hidden;
   perspective: 1000px;
@@ -102,7 +102,7 @@ const navigateTo = (route) => {
 
 @media (max-width: 768px) {
   .electrostatics-page {
-    padding-top: 5rem;
+    padding-top: 2rem;
   }
   
   .title {

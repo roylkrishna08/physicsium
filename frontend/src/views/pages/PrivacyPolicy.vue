@@ -88,7 +88,7 @@
 
 <style scoped>
 .privacy-container {
-  padding-top: 6rem;
+  padding-top: 2rem;
   padding-bottom: 4rem;
   min-height: 100vh;
 }

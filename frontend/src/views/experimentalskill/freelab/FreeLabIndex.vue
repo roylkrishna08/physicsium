@@ -62,6 +62,5 @@ const toggleSidebar = () => {
     display: flex;
     position: relative;
     overflow: hidden;
-    padding-top: 60px; /* Navbar height */
 }
 </style>

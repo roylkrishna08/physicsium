@@ -108,7 +108,7 @@ const isExperimental = (topic) => topic.title.toLowerCase().includes('experiment
 
 <style scoped>
 .topics-page {
-  padding-top: 8rem;
+  padding-top: 2rem;
   padding-bottom: 4rem;
 }
 
