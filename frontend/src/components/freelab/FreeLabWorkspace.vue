@@ -10,8 +10,9 @@ const selectedItemId = ref(null)
 // Actions
 const spawnItem = (type) => {
     const id = nextId.value++
-    const startX = 400 + (Math.random() * 100 - 50)
-    const startY = 300 + (Math.random() * 100 - 50)
+    // improved random placement center-ish
+    const startX = window.innerWidth / 2 + (Math.random() * 100 - 50) - 100
+    const startY = window.innerHeight / 2 + (Math.random() * 100 - 50)
     
     workspaceItems.value.push({
         id,
@@ -20,8 +21,8 @@ const spawnItem = (type) => {
         y: startY,
         state: { 
             isOn: false, 
-            fillLevel: type === 'test_tube' ? 50 : 0, // Demo fill 
-            intensity: 0.5, // 0 to 1
+            fillLevel: type === 'test_tube' ? 50 : 0, 
+            intensity: 0.5, 
             temperature: 25 
         } 
     })
@@ -44,6 +45,21 @@ const updateState = ({ id, isOn }) => {
     }
 }
 
+// Data Management
+const clearWorkspace = () => {
+    workspaceItems.value = []
+    selectedItemId.value = null
+    nextId.value = 1
+}
+
+const resetSim = () => {
+    workspaceItems.value.forEach(item => {
+        item.state.temperature = 25
+        item.state.isOn = false
+        if (item.state.fillLevel) item.state.fillLevel = 50
+    })
+}
+
 // Snapping Logic
 const handleDragEnd = (id) => {
     const item = workspaceItems.value.find(i => i.id === id)
@@ -53,14 +69,11 @@ const handleDragEnd = (id) => {
     if (item.type === 'test_tube') {
         const racks = workspaceItems.value.filter(i => i.type === 'test_tube_stand')
         for (const rack of racks) {
-            // Check distance (simple proximity)
             const dx = Math.abs(item.x - rack.x)
             const dy = Math.abs(item.y - rack.y)
             if (dx < 60 && dy < 60) {
-                // Snap to rack
-                // Ideally calculate specific hole positions
-                item.x = rack.x + 20 // Offset slightly
-                item.y = rack.y - 40 // Sit in rack
+                item.x = rack.x + 20 
+                item.y = rack.y - 40 
                 return
             }
         }
@@ -73,7 +86,6 @@ const handleDragEnd = (id) => {
              const dx = Math.abs(item.x - tube.x)
              const dy = Math.abs(item.y - tube.y)
              if (dx < 40 && dy < 80) {
-                 // Attach (visually move holder to tube neck)
                  item.x = tube.x - 40
                  item.y = tube.y + 10
                  return
@@ -108,37 +120,32 @@ const updateIntensity = (e) => {
 let simInterval = null
 onMounted(() => {
     simInterval = setInterval(() => {
-        // Simple Heat Transfer Model
         const burners = workspaceItems.value.filter(i => 
             ['bunsen_burner', 'spirit_lamp', 'kerosene_burner'].includes(i.type) && i.state.isOn
         )
         
         workspaceItems.value.forEach(item => {
-            if (item.type === 'thermometer' || item.type === 'test_tube' || item.type === 'beaker') {
-                let targetTemp = 25 // Ambient
+            if (['thermometer', 'test_tube', 'beaker', 'measuring_cylinder'].includes(item.type)) {
+                let targetTemp = 25 
                 
-                // Check user proximity to any active burner
-                // Hitbox for flame is roughly (burner.x, burner.y - 100) to (burner.x + width, burner.y)
-                // Proximity check
                 for (const burner of burners) {
-                    const dist = Math.hypot(item.x - burner.x, item.y - (burner.y - 80)) // Approx flame center
+                    const dist = Math.hypot(item.x - burner.x, item.y - (burner.y - 80)) 
                     
-                    if (dist < 60) { // Close to flame
+                    if (dist < 60) { 
                         const intensity = burner.state.intensity || 0.5
-                        targetTemp = 100 + (intensity * 400) // Max 500C
+                        targetTemp = 100 + (intensity * 400) 
                     }
                 }
                 
-                // Move towards target
                 const current = item.state.temperature || 25
                 if (current < targetTemp) {
-                    item.state.temperature = current + 2 // Heating rate
+                    item.state.temperature = current + 2 
                 } else if (current > targetTemp) {
-                    item.state.temperature = current - 1 // Cooling rate
+                    item.state.temperature = current - 1 
                 }
             }
         })
-    }, 100) // 10Hz
+    }, 100) 
 })
 
 onUnmounted(() => {
@@ -150,25 +157,52 @@ defineExpose({ spawnItem })
 
 <template>
     <div class="workspace" @click.self="deselectAll">
-        <!-- Empty State Hint -->
-        <div v-if="workspaceItems.length === 0" class="empty-hint">
-            <span class="pulse-icon">👆</span>
-            <p>Click instruments in the sidebar to add them here</p>
+        <!-- Background Decor -->
+        <div class="table-surface"></div>
+        <div class="table-edge"></div>
+
+        <!-- Global Controls -->
+        <div class="global-controls">
+            <button class="control-btn" @click="resetSim" title="Reset Simulation">
+                <span class="btn-icon">🔄</span> Reset
+            </button>
+            <button class="control-btn delete" @click="clearWorkspace" title="Clear All">
+                <span class="btn-icon">🗑️</span> Clear
+            </button>
         </div>
 
-        <!-- UI Controls (Overlay) -->
-        <div v-if="selectedItem && ['bunsen_burner', 'spirit_lamp', 'kerosene_burner'].includes(selectedItem.type)" class="controls-overlay">
-            <div class="control-panel">
-                <h4>{{ selectedItem.type.replace('_', ' ') }}</h4>
-                <label>Intensity</label>
-                <input 
-                    type="range" 
-                    min="0" max="1" step="0.1" 
-                    :value="selectedItem.state.intensity"
-                    @input="updateIntensity"
-                >
-            </div>
+        <!-- Empty State Hint -->
+        <div v-if="workspaceItems.length === 0" class="empty-hint">
+            <span class="pulse-icon">🧪</span>
+            <p>Drag instruments from the sidebar to begin</p>
         </div>
+
+        <!-- Float Control Panel for Selected Item -->
+        <Transition name="fade">
+            <div v-if="selectedItem && ['bunsen_burner', 'spirit_lamp', 'kerosene_burner'].includes(selectedItem.type)" 
+                 class="item-controls"
+                 :style="{ left: (selectedItem.x + 80) + 'px', top: selectedItem.y + 'px' }"
+            >
+                <div class="control-header">
+                    <span class="control-title">{{ selectedItem.type.replace('_', ' ') }}</span>
+                    <button class="close-btn" @click.stop="deselectAll">×</button>
+                </div>
+                
+                <div class="control-body">
+                    <label>Flame Intensity</label>
+                    <div class="range-wrapper">
+                        <span>Low</span>
+                        <input 
+                            type="range" 
+                            min="0" max="1" step="0.1" 
+                            :value="selectedItem.state.intensity"
+                            @input="updateIntensity"
+                        >
+                        <span>High</span>
+                    </div>
+                </div>
+            </div>
+        </Transition>
 
         <!-- Render Items -->
         <DraggableApparatus 
@@ -189,37 +223,65 @@ defineExpose({ spawnItem })
 .workspace {
     flex: 1;
     position: relative;
-    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
     overflow: hidden;
-    /* Dot Grid Background */
-    background-image: radial-gradient(#334155 1px, transparent 1px);
-    background-size: 20px 20px;
+    background: #0f172a; /* Fallback */
+    perspective: 1000px;
 }
 
-.controls-overlay {
+/* Realistic Table Styles */
+.table-surface {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: 
+        radial-gradient(circle at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 60%),
+        linear-gradient(to bottom, #1e293b 0%, #0f172a 100%);
+    z-index: 0;
+}
+
+.table-edge {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 20px;
+    background: linear-gradient(to bottom, #334155, #1e293b);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+    z-index: 1;
+}
+
+.global-controls {
     position: absolute;
     top: 20px;
     right: 20px;
-    z-index: 1000;
+    display: flex;
+    gap: 10px;
+    z-index: 50;
 }
 
-.control-panel {
-    background: rgba(15, 23, 42, 0.9);
-    padding: 1rem;
+.control-btn {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+    padding: 8px 16px;
     border-radius: 8px;
-    border: 1px solid #334155;
-    color: white;
-    backdrop-filter: blur(4px);
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-family: inherit;
 }
 
-.control-panel h4 {
-    margin: 0 0 0.5rem 0;
-    text-transform: capitalize;
+.control-btn:hover {
+    background: rgba(51, 65, 85, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-.control-panel input[type="range"] {
-    width: 150px;
-    margin-top: 0.5rem;
+.control-btn.delete:hover {
+    background: rgba(220, 38, 38, 0.2);
+    border-color: rgba(220, 38, 38, 0.4);
+    color: #fca5a5;
 }
 
 .empty-hint {
@@ -228,20 +290,113 @@ defineExpose({ spawnItem })
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(148, 163, 184, 0.4);
     pointer-events: none;
+    z-index: 10;
 }
 
 .pulse-icon {
-    font-size: 3rem;
+    font-size: 4rem;
     display: block;
     margin-bottom: 1rem;
-    animation: pulse 2s infinite;
+    filter: drop-shadow(0 0 20px rgba(56, 189, 248, 0.2));
+    animation: float 3s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0% { opacity: 0.3; transform: scale(1); }
-    50% { opacity: 0.7; transform: scale(1.1); }
-    100% { opacity: 0.3; transform: scale(1); }
+/* Item Controls Floating Panel */
+.item-controls {
+    position: absolute;
+    width: 200px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+}
+
+.control-header {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.control-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    text-transform: capitalize;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.close-btn:hover { color: #fff; }
+
+.control-body {
+    padding: 12px;
+}
+
+.control-body label {
+    display: block;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.range-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+input[type="range"] {
+    flex: 1;
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+    appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #38bdf8;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
 }
 </style>
+

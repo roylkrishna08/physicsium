@@ -38,7 +38,7 @@ const selectInstrument = (id) => {
 <template>
     <div class="instrument-bar">
         <div class="bar-header">
-            <h3>Tools</h3>
+            <h3>Lab Tools</h3>
         </div>
         
         <div class="instrument-list">
@@ -48,10 +48,9 @@ const selectInstrument = (id) => {
                 class="instrument-item"
                 :class="{ active: activeId === inst.id, [inst.type]: true }"
                 @click="selectInstrument(inst.id)"
-                :title="inst.name"
             >
                 <div class="icon">{{ inst.icon }}</div>
-                <!-- <span class="label">{{ inst.name }}</span> -->
+                <div class="tooltip">{{ inst.name }}</div>
             </div>
         </div>
     </div>
@@ -60,74 +59,133 @@ const selectInstrument = (id) => {
 <style scoped>
 .instrument-bar {
     width: 80px;
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(10px);
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     height: 100%;
     z-index: 10;
+    transition: width 0.3s ease;
 }
 
 .bar-header {
-    padding: 1.5rem;
+    padding: 1.5rem 0;
+    text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .bar-header h3 {
     margin: 0;
-    font-size: 1.2rem;
-    color: var(--primary-glow);
+    font-size: 0.7rem;
+    color: #94a3b8;
     text-transform: uppercase;
-    display: none;
+    letter-spacing: 1px;
+    font-weight: 600;
 }
 
 .instrument-list {
     flex: 1;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 1rem 0.8rem;
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 1rem;
+}
+
+.instrument-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.instrument-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
 }
 
 .instrument-item {
+    position: relative;
     display: flex;
     justify-content: center;
-    padding: 0.8rem;
+    align-items: center;
+    width: 100%;
+    aspect-ratio: 1;
     border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid transparent;
 }
 
 .instrument-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateX(5px);
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-.instrument-item.active {
-    background: rgba(0, 212, 255, 0.15);
-    border-color: rgba(0, 212, 255, 0.3);
-    color: white;
-}
-
-/* Chemistry distinct style */
-.instrument-item.chemistry.active {
-    background: rgba(255, 0, 85, 0.15);
-    border-color: rgba(255, 0, 85, 0.3);
+.instrument-item:active {
+    transform: translateY(0);
 }
 
 .icon {
-    font-size: 1.4rem;
-    margin-right: 0;
-    width: 30px;
-    text-align: center;
+    font-size: 1.5rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
-.label {
-    font-size: 0.95rem;
-    font-weight: 500;
+/* Tooltips */
+.tooltip {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%) translateX(10px);
+    background: rgba(15, 23, 42, 0.95);
+    color: #e2e8f0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+}
+
+.tooltip::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.instrument-item:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(15px);
+}
+
+/* Category Colors (Subtle glows) */
+.instrument-item.chemistry:hover {
+    box-shadow: 0 4px 15px rgba(236, 72, 153, 0.15);
+    border-color: rgba(236, 72, 153, 0.3);
+}
+
+.instrument-item.tool:hover {
+    box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.instrument-item.general:hover {
+    box-shadow: 0 4px 15px rgba(250, 204, 21, 0.15);
+    border-color: rgba(250, 204, 21, 0.3);
 }
 </style>

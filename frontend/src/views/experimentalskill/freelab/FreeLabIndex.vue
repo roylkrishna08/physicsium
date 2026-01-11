@@ -34,11 +34,13 @@ const toggleSidebar = () => {
         />
         
         <div class="lab-content">
-            <InstrumentBar 
-                v-show="!isSidebarCollapsed"
-                :activeId="null"
-                @select="handleInstrumentSelect"
-            />
+            <Transition name="slide">
+                <InstrumentBar 
+                    v-show="!isSidebarCollapsed"
+                    :activeId="null"
+                    @select="handleInstrumentSelect"
+                />
+            </Transition>
             
             <FreeLabWorkspace 
                 ref="workspaceRef"
@@ -62,5 +64,17 @@ const toggleSidebar = () => {
     display: flex;
     position: relative;
     overflow: hidden;
+}
+
+/* Sidebar Transition */
+.slide-enter-active,
+.slide-leave-active {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+    transform: translateX(-100%);
+    opacity: 0;
 }
 </style>
