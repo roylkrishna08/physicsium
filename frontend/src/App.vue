@@ -11,11 +11,11 @@ const isLabMode = computed(() => route.path.includes('/lab') || route.path.inclu
 
 <template>
   <div class="app-layout">
-    <NavBar v-if="!isLabMode && !route.path.includes('/electrostatics/charges')" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
+    <NavBar v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/gravitation')" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
     
     <RouterView :activeExam="activeExam" />
   
-    <Footer v-if="!isLabMode && !route.path.includes('/electrostatics/charges')" />
+    <Footer v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/gravitation')" />
   </div>
 </template>
 

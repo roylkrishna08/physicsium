@@ -48,6 +48,8 @@ const handleTopicClick = (topic) => {
         router.push('/lab/projectile')
     } else if (title.includes('electrostatics')) {
         router.push('/electrostatics')
+    } else if (title.includes('gravitation')) {
+        router.push('/gravitation')
     } else {
         // Placeholder for future modules
         alert(`${topic.title} module is coming soon!`)

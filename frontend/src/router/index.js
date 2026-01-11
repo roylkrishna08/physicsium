@@ -65,6 +65,17 @@ const router = createRouter({
             ]
         },
         {
+            path: '/gravitation',
+            children: [
+                { path: '', name: 'gravitation-index', component: () => import('../views/gravitation/GravitationLayout.vue') },
+                { path: 'universal-law', name: 'universal-law', component: () => import('../views/gravitation/UniversalLaw.vue') },
+                { path: 'acceleration', name: 'acceleration', component: () => import('../views/gravitation/AccelerationGravity.vue') },
+                { path: 'kepler', name: 'kepler', component: () => import('../views/gravitation/KeplersLaws.vue') },
+                { path: 'potential', name: 'potential', component: () => import('../views/gravitation/GravitationalPotential.vue') },
+                { path: 'satellite', name: 'satellite', component: () => import('../views/gravitation/SatelliteMotion.vue') }
+            ]
+        },
+        {
             path: '/freelab',
             name: 'freelab',
             component: FreeLabIndex
