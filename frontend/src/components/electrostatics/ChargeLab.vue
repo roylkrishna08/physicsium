@@ -8,6 +8,7 @@ import ConservationLab from './labs/ConservationLab.vue'
 import CoulombLab from './labs/CoulombLab.vue'
 import MultipleForcesLab from './labs/MultipleForcesLab.vue'
 import ChargeDistributionLab from './labs/ChargeDistributionLab.vue'
+import Continuous3DLab from './labs/Continuous3DLab.vue'
 import DrawingCanvas from '../drawingTool/DrawingCanvas.vue'
 import DrawingSidebar from '../drawingTool/DrawingSidebar.vue'
 
@@ -56,7 +57,8 @@ const topics = [
     { id: 'conservation', label: "Conservation of Charge" },
     { id: 'coulomb', label: "Coulomb's Law" },
     { id: 'multiple', label: "Force between Multiple Charges" },
-    { id: 'distribution', label: "Charge Distribution" }
+    { id: 'distribution', label: "Charge Distribution" },
+    { id: 'continuous3d', label: "Continuous 3D" }
 ]
 const activeTopic = ref('conservation')
 
@@ -181,6 +183,23 @@ const updateDistributionCharge = (val) => {
     }
 }
 
+
+const continuous3DRef = ref(null)
+const c3dMaterial = ref('dielectric')
+const c3dShape = ref('solid_sphere')
+const c3dCoords = ref('cartesian')
+const c3dFunction = ref('1')
+const c3dCutMode = ref('full')
+const c3dShowGraph = ref(false)
+const c3dShowDistribution = ref(false)
+
+const handleGraphToggle = () => {
+    c3dShowGraph.value = !c3dShowGraph.value
+}
+
+const handleDistributionToggle = () => {
+    c3dShowDistribution.value = !c3dShowDistribution.value
+}
 
 const updateCharge = (index, value) => {
     if (coulombLabRef.value) {
@@ -414,6 +433,84 @@ const updateCharge = (index, value) => {
                     </label>
                 </div>
             </div>
+
+            <!-- Continuous 3D Lab Controls -->
+            <div class="sidebar-controls" v-if="activeTopic === 'continuous3d'">
+                <h3>3D Configuration</h3>
+                
+                <div class="control-group">
+                    <label class="slider-label">Material Type</label>
+                    <select v-model="c3dMaterial" class="shape-dropdown">
+                        <option value="dielectric">Dielectric (Insulator)</option>
+                        <option value="conductor">Conductor (Metal)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="slider-label">Select Shape</label>
+                    <select v-model="c3dShape" class="shape-dropdown">
+                        <option value="rod">Rod (1D)</option>
+                        <option value="solid_sphere">Solid Sphere</option>
+                        <option value="hollow_sphere">Hollow Sphere</option>
+                        <option value="solid_cylinder">Solid Cylinder</option>
+                        <option value="hollow_cylinder">Hollow Cylinder</option>
+                        <option value="disk">Disk (2D)</option>
+                        <option value="cube">Cube</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="slider-label">Coordinate System</label>
+                    <select v-model="c3dCoords" class="shape-dropdown">
+                        <option value="cartesian">Cartesian (x, y, z)</option>
+                        <option value="spherical">Spherical (r, θ, φ)</option>
+                        <option value="cylindrical">Cylindrical (ρ, φ, z)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="slider-label">Distribution Func ρ/λ/σ</label>
+                    <input 
+                        type="text" 
+                        v-model="c3dFunction" 
+                        class="number-input" 
+                        placeholder="e.g. x*x + y*y"
+                    >
+                    <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
+                        Use standard JS math: <code>Math.sin(theta)</code>, etc.
+                    </p>
+                </div>
+
+                <div class="control-group">
+                    <label class="slider-label">Cut View</label>
+                    <select v-model="c3dCutMode" class="shape-dropdown">
+                        <option value="full">Full Shape</option>
+                        <option value="slice_xy">Half Slice (XY Plane)</option>
+                        <option value="cut_octant">Corner Cut (1st Octant)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <button class="btn-action" @click="handleDistributionToggle" style="width: 100%; margin-bottom: 5px;">
+                        {{ c3dShowDistribution ? 'Show Shape Only' : 'Show Distribution' }}
+                    </button>
+                    <button class="btn-clear" @click="handleGraphToggle" style="width: 100%;">
+                        {{ c3dShowGraph ? 'Close Graph' : 'Show Graph' }}
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <label class="slider-label">Zoom Level: {{ coulombZoom.toFixed(1) }}x</label>
+                    <input 
+                        type="range" 
+                        v-model.number="coulombZoom" 
+                        min="0.5" 
+                        max="2" 
+                        step="0.1"
+                        class="range-slider"
+                    >
+                </div>
+            </div>
         </ControlSidebar>
 
         <div class="lab-viewport" :style="viewportStyle">
@@ -443,6 +540,18 @@ const updateCharge = (index, value) => {
                     :show-grid="showGrid"
                     :zoom="coulombZoom"
                     @select="updateDistributionSelection"
+                />
+                <Continuous3DLab
+                    v-else-if="activeTopic === 'continuous3d'"
+                    ref="continuous3DRef"
+                    :shape="c3dShape"
+                    :material="c3dMaterial"
+                    :coords="c3dCoords"
+                    :distributionFunc="c3dFunction"
+                    :cutMode="c3dCutMode"
+                    :showGraph="c3dShowGraph"
+                    :showDistribution="c3dShowDistribution"
+                    :zoom="coulombZoom"
                 />
             </transition>
         </div>
