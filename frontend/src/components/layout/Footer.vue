@@ -8,6 +8,7 @@
         <div class="links">
             <router-link to="/syllabus">Syllabus</router-link>
             <router-link to="/experiments">Experiments</router-link>
+            <router-link to="/pyq">Previous Year Papers</router-link>
             <router-link to="/privacy-policy">Privacy Policy</router-link>
             <a href="#">Contact</a>
         </div>

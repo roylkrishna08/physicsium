@@ -89,6 +89,26 @@ const router = createRouter({
             path: '/drawing-test',
             name: 'drawing-test',
             component: DrawingView
+        },
+        {
+            path: '/pyq',
+            name: 'pyq',
+            component: () => import('../views/pyq/PYQView.vue')
+        },
+        {
+            path: '/pyq/jee-mains',
+            name: 'jee-mains-pyq',
+            component: () => import('../views/pyq/JEEMainsView.vue')
+        },
+        {
+            path: '/pyq/jee-mains/:unitId',
+            name: 'jee-mains-unit-detail',
+            component: () => import('../views/pyq/JEEMainsUnitView.vue')
+        },
+        {
+            path: '/pyq/jee-mains/:unitId/:topicId',
+            name: 'jee-mains-topic-questions',
+            component: () => import('../views/pyq/JEEMainsTopicView.vue')
         }
     ],
     scrollBehavior(to, from, savedPosition) {

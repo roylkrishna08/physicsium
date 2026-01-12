@@ -188,10 +188,11 @@ const continuous3DRef = ref(null)
 const c3dMaterial = ref('dielectric')
 const c3dShape = ref('solid_sphere')
 const c3dCoords = ref('cartesian')
-const c3dFunction = ref('1')
+const c3dFunction = ref('r')
 const c3dCutMode = ref('full')
 const c3dShowGraph = ref(false)
 const c3dShowDistribution = ref(false)
+const c3dShowAxis = ref(false)
 
 const handleGraphToggle = () => {
     c3dShowGraph.value = !c3dShowGraph.value
@@ -199,6 +200,10 @@ const handleGraphToggle = () => {
 
 const handleDistributionToggle = () => {
     c3dShowDistribution.value = !c3dShowDistribution.value
+}
+
+const handleAxisToggle = () => {
+    c3dShowAxis.value = !c3dShowAxis.value
 }
 
 const updateCharge = (index, value) => {
@@ -477,7 +482,8 @@ const updateCharge = (index, value) => {
                         placeholder="e.g. x*x + y*y"
                     >
                     <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
-                        Use standard JS math: <code>Math.sin(theta)</code>, etc.
+                        Try: <code>sin(r)</code>, <code>1/r</code>, <code>exp(-r)</code>
+
                     </p>
                 </div>
 
@@ -494,8 +500,11 @@ const updateCharge = (index, value) => {
                     <button class="btn-action" @click="handleDistributionToggle" style="width: 100%; margin-bottom: 5px;">
                         {{ c3dShowDistribution ? 'Show Shape Only' : 'Show Distribution' }}
                     </button>
-                    <button class="btn-clear" @click="handleGraphToggle" style="width: 100%;">
+                    <button class="btn-clear" @click="handleGraphToggle" style="width: 100%; margin-bottom: 5px;">
                         {{ c3dShowGraph ? 'Close Graph' : 'Show Graph' }}
+                    </button>
+                    <button class="btn-clear" @click="handleAxisToggle" style="width: 100%;">
+                        {{ c3dShowAxis ? 'Hide Axis' : 'Show Axis' }}
                     </button>
                 </div>
 
@@ -551,6 +560,7 @@ const updateCharge = (index, value) => {
                     :cutMode="c3dCutMode"
                     :showGraph="c3dShowGraph"
                     :showDistribution="c3dShowDistribution"
+                    :showAxis="c3dShowAxis"
                     :zoom="coulombZoom"
                 />
             </transition>
