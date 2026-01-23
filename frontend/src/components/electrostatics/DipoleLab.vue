@@ -31,13 +31,42 @@ const topics = [
 ]
 
 // Simulation Controls
-const showGrid = ref(true)
-const showFieldLines = ref(true)
-const showVectors = ref(true)    // New: show force/field vectors
+const showGrid = ref(false)
+const showFieldLines = ref(false)
+const showVectors = ref(false)    // New: show force/field vectors
 const isAnimating = ref(false)
 
 // Point Charge State
-const pointChargeQ = ref(1) // in microCoulombs
+const pointCharges = ref([])
+
+const addCharge = () => {
+    pointCharges.value.push({
+        id: Date.now(),
+        q: 1, 
+        x: null, // Will be initialized by Sim to center
+        y: null
+    })
+}
+
+const removeCharge = (index) => {
+    pointCharges.value.splice(index, 1)
+}
+
+// Test Charge State
+const testCharges = ref([])
+
+const addTestCharge = () => {
+    testCharges.value.push({
+        id: Date.now(),
+        x: null, // Center
+        y: null,
+        trail: [] // History
+    })
+}
+
+const clearTestCharges = () => {
+    testCharges.value = []
+}
 
 // Dipole State
 const dipoleCharge = ref(1)
@@ -72,7 +101,9 @@ const handleClearDrawing = () => {
 const handleTopicSelect = (topicId) => {
     activeTopic.value = topicId
     isAnimating.value = false
-    // Reset specific visuals if needed
+    if (topicId === 'point_charge') {
+        // Optional: Reset logic if needed
+    }
 }
 
 // Layout logic
@@ -89,6 +120,7 @@ const viewportStyle = computed(() => ({
     <div class="dipole-lab">
         <ElectrostaticsNavBar 
             experiment-name="Electric Field & Dipole" 
+            exit-path="/electrostatics"
             @toggleLeftSidebar="toggleSidebar"
             @toggleRightSidebar="toggleControls"
             @toggleDrawing="toggleDrawing"
@@ -116,7 +148,7 @@ const viewportStyle = computed(() => ({
                     <input type="checkbox" v-model="showGrid">
                     Show Gridlines
                 </label>
-                <label v-if="activeTopic !== 'torque'" class="toggle-label">
+                <label class="toggle-label">
                     <input type="checkbox" v-model="showFieldLines">
                     Show Field Lines
                 </label>
@@ -128,16 +160,33 @@ const viewportStyle = computed(() => ({
 
             <!-- Point Charge Controls -->
             <div v-if="activeTopic === 'point_charge'" class="sidebar-controls">
-                <h3>Point Charge</h3>
-                <p class="description">
-                    Investigate the electric field due to a point charge Q.
-                    <br><strong>E = kQ / r²</strong>
-                </p>
+                <h3>Point Charges</h3>
+                
+                <div v-for="(charge, idx) in pointCharges" :key="charge.id" class="control-group charge-card">
+                    <div class="charge-header">
+                        <span>Charge {{idx + 1}}</span>
+                        <button class="btn-icon" @click="removeCharge(idx)">×</button>
+                    </div>
+                    <label class="slider-label">Magnitude (µC)</label>
+                    <input type="number" v-model.number="charge.q" step="0.1" class="input-text">
+                </div>
+
                 <div class="control-group">
-                    <label class="slider-label">Charge Q ({{pointChargeQ}} µC)</label>
-                    <input type="range" v-model.number="pointChargeQ" min="-5" max="5" step="0.5" class="range-slider">
-                    <div class="indicator-row">
-                        <span>-5µC</span><span>0</span><span>+5µC</span>
+                     <button class="btn-action" @click="addCharge">+ Add Charge</button>
+                </div>
+
+                <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
+                    <h3>Test Charges (q0)</h3>
+                    <p class="description" style="margin-bottom: 0.5rem">
+                         Release a positive test charge to visualize the field line path.
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-action" style="margin-top:0; flex: 1; background: #ea580c;" @click="addTestCharge">
+                            Release q0
+                        </button>
+                         <button class="btn-action" style="margin-top:0; width: 40px; background: #64748b;" @click="clearTestCharges" title="Clear All q0">
+                            ×
+                        </button>
                     </div>
                 </div>
             </div>
@@ -145,9 +194,6 @@ const viewportStyle = computed(() => ({
             <!-- Dipole Field Controls -->
             <div v-if="activeTopic === 'dipole_field'" class="sidebar-controls">
                 <h3>Electric Dipole</h3>
-                <p class="description">
-                    Two point charges +q and -q separated by a small distance 2a.
-                </p>
                 <div class="control-group">
                     <label class="slider-label">Charge Magnitude q ({{dipoleCharge}} µC)</label>
                     <input type="range" v-model.number="dipoleCharge" min="0.5" max="5" step="0.5" class="range-slider">
@@ -161,10 +207,7 @@ const viewportStyle = computed(() => ({
             <!-- Torque Controls -->
             <div v-if="activeTopic === 'torque'" class="sidebar-controls">
                 <h3>Torque in Uniform Field</h3>
-                <p class="description">
-                    A dipole in a uniform electric field experiences a torque <strong>τ = p × E</strong>.
-                </p>
-                 <div class="control-group">
+                <div class="control-group">
                     <label class="slider-label">Electric Field (E): {{electricFieldStrength}} N/C</label>
                     <input type="range" v-model.number="electricFieldStrength" min="1" max="10" class="range-slider">
                 </div>
@@ -190,7 +233,10 @@ const viewportStyle = computed(() => ({
                 :show-field-lines="showFieldLines"
                 :show-vectors="showVectors"
                 :play-animation="isAnimating"
-                :point-q="pointChargeQ"
+                :charges="pointCharges"
+                @update:charges="pointCharges = $event"
+                :test-charges="testCharges"
+                @update:test-charges="testCharges = $event"
                 :dipole-q="dipoleCharge"
                 :dipole-sev="dipoleSeparation"
                 :torque-e="electricFieldStrength"
@@ -227,6 +273,40 @@ const viewportStyle = computed(() => ({
     width: 100%;
 }
 
+.charge-card {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.charge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #e2e8f0;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 1.2rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.input-text {
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    padding: 6px;
+    color: white;
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+
 .dipole-lab {
     position: fixed;
     top: 0;
@@ -243,13 +323,16 @@ const viewportStyle = computed(() => ({
 
 /* Ensure navbar is above sidebars if they overlap at top */
 :deep(.lab-navbar) {
-    z-index: 60 !important; 
+    position: relative !important;
+    z-index: 120 !important; 
+    pointer-events: auto !important;
 }
 
 /* Ensure Sidebars are above canvas */
 :deep(.lab-sidebar-container),
 :deep(.control-sidebar-container) {
-    z-index: 50 !important;
+    z-index: 110 !important;
+    pointer-events: auto !important;
 }
 
 .lab-viewport {
