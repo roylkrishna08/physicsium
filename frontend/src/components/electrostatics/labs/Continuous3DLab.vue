@@ -15,6 +15,8 @@ const props = defineProps({
     zoom: { type: Number, default: 1 }
 })
 
+const emit = defineEmits(['toggle-graph'])
+
 const containerRef = ref(null)
 const canvasRef = ref(null)
 
@@ -37,26 +39,75 @@ const handleResize = () => {
     }
 }
 
-let scene, camera, renderer, controls, pointCloud, shapeMesh, axesHelper, axesLabels
+// Physics & Math Helpers
+const mathKeys = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'exp', 'log', 'pow', 'sqrt', 'abs', 'PI', 'E', 'floor', 'ceil', 'round', 'min', 'max', 'random'];
+const mathValues = mathKeys.map(k => Math[k]);
+
+let scene, camera, renderer, controls, pointCloud, shapeMesh, axesHelper, axesLabels, samplingLine
 let frameId
 
-// Function Evaluator
-const evaluateFunction = (x, y, z) => {
-    try {
-        // 1. Calculate normalized coordinates
-        const r = Math.sqrt(x*x + y*y + z*z);
-        const theta = Math.acos(z / (r || 1)); // Safe div
-        const phi = Math.atan2(y, x); 
-        const rho = Math.sqrt(x*x + y*y);
+// Graph UI State
+const graphAxis = ref('r')
+const axisOptions = computed(() => {
+    if (props.coords === 'cartesian') {
+        return [
+            { label: 'Axis: X', value: 'x' },
+            { label: 'Axis: Y', value: 'y' },
+            { label: 'Axis: Z', value: 'z' }
+        ]
+    } else if (props.coords === 'spherical') {
+        return [
+            { label: 'Axis: r', value: 'r' },
+            { label: 'Axis: θ', value: 'theta' },
+            { label: 'Axis: φ', value: 'phi' }
+        ]
+    } else if (props.coords === 'cylindrical') {
+        return [
+            { label: 'Axis: ρ', value: 'rho' },
+            { label: 'Axis: φ', value: 'phi' },
+            { label: 'Axis: z', value: 'z' }
+        ]
+    }
+    return [{ label: 'Axis: r', value: 'r' }]
+})
 
-        // 2. Prepare user-friendly scope (destructure Math)
-        // This allows users to type 'sin(x)' instead of 'Math.sin(x)'
-        const mathKeys = Object.getOwnPropertyNames(Math);
-        const mathValues = mathKeys.map(k => Math[k]);
-        
-        // 3. Create Function
-        // Args: Math keys..., coordinate keys..., function body
-        const f = new Function(
+const graphYLabel = computed(() => {
+    return (graphAxis.value === 'r') ? 'Electric Field (E)' : 'Charge Density (ρ)'
+})
+
+const graphTicks = computed(() => {
+    if (['x', 'y', 'z'].includes(graphAxis.value)) {
+        return [
+            { x: 50, label: '-1', sub: '-R' },
+            { x: 200, label: '0' },
+            { x: 350, label: '1', sub: '+R' }
+        ]
+    } else if (graphAxis.value === 'theta') {
+        return [
+            { x: 50, label: '0', sub: '0°' },
+            { x: 200, label: 'π/2', sub: '90°' },
+            { x: 350, label: 'π', sub: '180°' }
+        ]
+    } else if (graphAxis.value === 'phi') {
+        return [
+            { x: 50, label: '0', sub: '0°' },
+            { x: 200, label: 'π', sub: '180°' },
+            { x: 350, label: '2π', sub: '360°' }
+        ]
+    }
+    // Default (r or rho)
+    return [
+        { x: 50, label: '0', sub: 'Center' },
+        { x: 350, label: '1', sub: 'Radius' }
+    ]
+})
+
+// Reactive Compiled Function
+const compiledDistributionFn = ref(null);
+
+const compileFunction = () => {
+    try {
+        compiledDistributionFn.value = new Function(
             ...mathKeys,
             'x', 'y', 'z', 'r', 'theta', 'phi', 'rho', 
             `"use strict";
@@ -67,79 +118,132 @@ const evaluateFunction = (x, y, z) => {
                 return 0; 
             }`
         );
-        
-        // 4. Execute
-        const result = f(...mathValues, x, y, z, r, theta, phi, rho);
-        
-        // 5. Safety Checks
-        if (isNaN(result)) return 0;
-        if (!isFinite(result)) return 1000; // Clamp Infinity (e.g. 1/r at r=0)
-        return Math.max(0, result); // No negative density
-        
     } catch (e) {
-        console.error("Distribution Eval Error:", e);
-        return 0;
+        console.error("Function Compilation Error:", e);
+        compiledDistributionFn.value = () => 0;
     }
+};
+
+// Helper to get color string matching 3D points
+const getColorForValue = (val, maxAbs) => {
+    if (maxAbs === 0) return 'hsl(120, 100%, 50%)'; // Green for zero
+    const normalized = Math.max(0, Math.min(1, (val + maxAbs) / (maxAbs * 2)));
+    const hue = 240 * (1 - normalized); // 240 is Blue, 0 is Red in HSL (degrees)
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
+// Function Evaluator (Caller) - Now extremely fast
+const evaluateFunction = (x, y, z) => {
+    if (!compiledDistributionFn.value) return 0;
+    
+    // 1. Calculate normalized coordinates
+    const r = Math.sqrt(x*x + y*y + z*z);
+    const theta = Math.acos(Math.max(-1, Math.min(1, z / (r || 1)))); 
+    let phi = Math.atan2(y, x); 
+    if (phi < 0) phi += 2 * Math.PI;
+    const rho = Math.sqrt(x*x + y*y);
+
+    // 2. Execute compiled function
+    const result = compiledDistributionFn.value(...mathValues, x, y, z, r, theta, phi, rho);
+    
+    // 3. Safety Checks
+    if (isNaN(result)) return 0;
+    if (!isFinite(result)) return result > 0 ? 1000 : -1000; 
+    return result; // Allow negative charge density
 }
 
 // Graph Data Generation
-const graphPath = computed(() => {
-    // We want to plot Charge Density (ρ) vs Distance (r)
-    // We'll sample along the X-axis for simplicity (assuming spherical symmetry or slice)
-    
-    // SVG Dimensions: 50,180 (origin) to 350,20 (max)
-    // X-axis: 0 to 1 (normalized r) -> 50 to 350
-    // Y-axis: 0 to MaxDensity -> 180 to 20
-    
-    const points = [];
+const graphData = computed(() => {
     const samples = 100;
-    
-    // 1. Collect Data
-    let maxRho = 0;
     const data = [];
+    const dx = 1 / samples;
+    const size = 100;
     
-    for(let i=0; i<=samples; i++) {
-        const rNorm = i / samples; // 0 to 1
-        // Evaluate at (r, 0, 0)
-        // If shape is cube/cylinder, this is a cut along X-axis
-        const val = evaluateFunction(rNorm, 0, 0);
-        
-        let safeVal = val;
-        if(isNaN(val)) safeVal = 0;
-        if(!isFinite(val)) {
-            // Handle Singularity for Graph: clamp to a "high" value relative to others
-            // We'll fix this in normalization step
-            safeVal = Infinity; 
+    if (graphAxis.value === 'r') {
+        let integral = 0;
+        for(let i=0; i<=samples; i++) {
+            const rNorm = i / samples; 
+            const rho = evaluateFunction(rNorm, 0, 0); 
+            if (i > 0) {
+                const prevR = (i - 1) / samples;
+                const avgRho = (rho + evaluateFunction(prevR, 0, 0)) / 2;
+                let dV = 4 * Math.PI * Math.pow(rNorm, 2) * dx;
+                if (props.shape === 'rod') dV = dx;
+                else if (props.shape === 'disk') dV = 2 * Math.PI * rNorm * dx;
+                integral += avgRho * dV;
+            }
+            let E = 0;
+            if (rNorm > 0.05) {
+                if (props.shape === 'rod') E = integral / rNorm;
+                else if (props.shape === 'disk') E = integral / (rNorm + 0.1);
+                else E = integral / (rNorm * rNorm);
+            }
+            data.push({ t: rNorm, val: E });
         }
-        
-        data.push({ r: rNorm, rho: safeVal });
-        
-        if(isFinite(safeVal) && safeVal > maxRho) maxRho = safeVal;
+    } else {
+        for(let i=0; i<=samples; i++) {
+            let t = i / samples; // 0 to 1
+            let x=0, y=0, z=0;
+            
+            // Cartesian: Map [0, 1] to [-1, 1]
+            const rangeT = (t * 2 - 1); 
+
+            if (graphAxis.value === 'x') { x = rangeT; y = 0; z = 0; }
+            else if (graphAxis.value === 'y') { y = rangeT; x = 0; z = 0; }
+            else if (graphAxis.value === 'z') { z = rangeT; x = 0; y = 0; }
+            else if (graphAxis.value === 'theta') { 
+                // Sample at Surface (r=1)
+                const th = t * Math.PI;
+                x = Math.sin(th); z = Math.cos(th); y = 0;
+            }
+            else if (graphAxis.value === 'phi') { 
+                // Sample at Surface (r=1)
+                const ph = t * 2 * Math.PI;
+                x = Math.cos(ph); y = Math.sin(ph); z = 0;
+            }
+            else if (graphAxis.value === 'rho') { x = t; y = 0; z = 0; }
+            
+            data.push({ t, val: evaluateFunction(x, y, z) });
+        }
     }
     
-    // Handle All-Zero or All-Infinite
-    if(maxRho === 0) maxRho = 1; 
-    
-    // If we have infinities, we clamp them to 1.2 * maxFiniteRho
-    const clampVal = maxRho * 1.5;
-    
-    // 2. Map to SVG Path
-    let path = `M 50 180`; // Start at origin
-    
-    data.forEach(p => {
-        const x = 50 + (p.r * 300); // 50 + 0..300
-        
-        let rho = p.rho;
-        if(rho === Infinity) rho = clampVal;
-        
-        // Normalize Y: 0 -> 180, Max -> 20
-        // y = 180 - (rho / clampVal) * 160
-        const y = 180 - (Math.min(rho, clampVal) / clampVal) * 160;
-        
-        path += ` L ${x} ${y}`;
+    let maxVal = 0, minVal = 0;
+    data.forEach(d => {
+        if (d.val > maxVal) maxVal = d.val;
+        if (d.val < minVal) minVal = d.val;
     });
     
-    return path;
+    let range = Math.max(Math.abs(maxVal), Math.abs(minVal));
+    if (range === 0) range = 1;
+
+    let path = "";
+    let stops = [];
+    data.forEach((p, idx) => {
+        const xPos = 50 + (p.t * 300);
+        let yPos;
+        if (minVal < 0) {
+            const mid = 100;
+            yPos = mid - (p.val * (80 / range));
+        } else {
+            yPos = 180 - (p.val / range) * 160;
+        }
+        path += (idx === 0) ? `M ${xPos} ${yPos}` : ` L ${xPos} ${yPos}`;
+        
+        // Color Stop for gradient
+        if (idx % 5 === 0 || idx === data.length - 1) {
+            const offset = (p.t * 100).toFixed(1);
+            stops.push({ offset: `${offset}%`, color: getColorForValue(p.val, range) });
+        }
+    });
+    
+    return { path, minVal, maxVal, range, stops };
+});
+
+const graphOriginX = computed(() => {
+    // For Cartesian (x,y,z), 0 is at center (200px: 50 + 150)
+    if (['x', 'y', 'z'].includes(graphAxis.value)) return 200;
+    // For others (r, theta, phi), 0 is at left (50px)
+    return 50;
 });
 
 // Helper to create soft glow
@@ -272,11 +376,10 @@ const generatePoints = () => {
 
         if (valid) {
              const density = evaluateFunction(x/size, y/size, z/size);
-             const safeDensity = isNaN(density) ? 0 : Math.max(0, density);
+             const safeDensity = isNaN(density) ? 0 : density;
              
-             // Uniform Sampling: We accept ALL valid points to fill the shape volume
-             // Density is visualized via Color Only, not point density.
-             // This ensures users can see "Zero Charge" regions as Blue.
+             // Charge Density is visualized via Color. 
+             // Positive -> Reds, Negative -> Blues.
              
              positions.push(x, y, z);
              rawDensities.push(safeDensity);
@@ -288,35 +391,27 @@ const generatePoints = () => {
         }
     }
 
-    // 3. Deferred Coloring: Relative Normalization (Blue -> Red)
-    // Find the true range of densities in the generated cloud
-    const densityStats = [...rawDensities].sort((a, b) => a - b);
+    // 3. Absolute Normalization (Zero-Centered)
     let minDensity = 0;
-    let maxDensity = 1;
-    
-    if (densityStats.length > 0) {
-        minDensity = densityStats[0];
-        // Use 99th percentile for Max to ignore extreme singularity outliers
-        const p99Index = Math.floor(densityStats.length * 0.99);
-        maxDensity = densityStats[p99Index];
-        
-        // Safety: ensure max > min
-        if (maxDensity <= minDensity) {
-            maxDensity = densityStats[densityStats.length - 1]; // Absolute max
-            if (maxDensity <= minDensity) maxDensity = minDensity + 1; // Flat distribution
-        }
-    }
+    let maxDensity = 0;
+    rawDensities.forEach(d => {
+        if (d < minDensity) minDensity = d;
+        if (d > maxDensity) maxDensity = d;
+    });
 
-    const range = maxDensity - minDensity;
+    // Blue (-MaxAbs) -> Green (0) -> Red (+MaxAbs)
+    const maxAbs = Math.max(Math.abs(minDensity), Math.abs(maxDensity));
+    const range = maxAbs === 0 ? 1 : maxAbs * 2;
 
     for(let i=0; i<rawDensities.length; i++) {
         const d = rawDensities[i];
         
-        // Relative Normalize: (d - min) / (max - min)
-        let normalized = (d - minDensity) / range;
+        // Normalize [-maxAbs, maxAbs] to [0, 1]
+        let normalized = (d + maxAbs) / range;
         normalized = Math.max(0, Math.min(1, normalized));
         
         // Map to HSL: 0.66 (Blue) -> 0.0 (Red)
+        // 0.5 (Green) will correspond to d=0.
         const hue = 0.66 * (1 - normalized);
         
         const color = new THREE.Color();
@@ -406,12 +501,47 @@ const generateShapeMesh = () => {
     }
 }
 
+// 3D Sampling Line Helper
+const updateSamplingLine = () => {
+    if (!samplingLine) return;
+    
+    const size = 100;
+    const pts = [];
+    const samples = 50;
+    
+    if (graphAxis.value === 'r' || graphAxis.value === 'rho') {
+        pts.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(size, 0, 0));
+    } else if (graphAxis.value === 'x') {
+        pts.push(new THREE.Vector3(-size, 0, 0), new THREE.Vector3(size, 0, 0));
+    } else if (graphAxis.value === 'y') {
+        pts.push(new THREE.Vector3(0, -size, 0), new THREE.Vector3(0, size, 0));
+    } else if (graphAxis.value === 'z') {
+        pts.push(new THREE.Vector3(0, 0, -size), new THREE.Vector3(0, 0, size));
+    } else if (graphAxis.value === 'theta') {
+        for(let i=0; i<=samples; i++) {
+            const th = (i/samples) * Math.PI;
+            pts.push(new THREE.Vector3(size * Math.sin(th), 0, size * Math.cos(th)));
+        }
+    } else if (graphAxis.value === 'phi') {
+        for(let i=0; i<=samples; i++) {
+            const ph = (i/samples) * 2 * Math.PI;
+            pts.push(new THREE.Vector3(size * Math.cos(ph), size * Math.sin(ph), 0));
+        }
+    }
+
+    samplingLine.geometry.dispose();
+    samplingLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    samplingLine.computeLineDistances(); // Required for dashes
+    samplingLine.visible = props.showGraph;
+}
+
 const updateVisibility = () => {
     if(pointCloud) pointCloud.visible = props.showDistribution;
     if(shapeMesh) shapeMesh.visible = !props.showDistribution;
     
     if(axesHelper) axesHelper.visible = props.showAxis;
     if(axesLabels) axesLabels.visible = props.showAxis;
+    if(samplingLine) samplingLine.visible = props.showGraph;
 }
 
 const animate = () => {
@@ -443,9 +573,21 @@ const init = () => {
     directionalLight.position.set(1, 1, 1).normalize();
     scene.add(directionalLight);
 
-    // Axes Helper
-    axesHelper = new THREE.AxesHelper(150);
-    axesHelper.position.set(0, 0, 0);
+    // Custom Axes Helper (Positive and Negative)
+    const createAxis = (dir, color, length) => {
+        const pts = [
+            new THREE.Vector3().copy(dir).multiplyScalar(-length),
+            new THREE.Vector3().copy(dir).multiplyScalar(length)
+        ];
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({ color: color, opacity: 0.5, transparent: true });
+        return new THREE.Line(geo, mat);
+    };
+
+    axesHelper = new THREE.Group();
+    axesHelper.add(createAxis(new THREE.Vector3(1, 0, 0), 0xff0000, 150)); // X
+    axesHelper.add(createAxis(new THREE.Vector3(0, 1, 0), 0x00ff00, 150)); // Y
+    axesHelper.add(createAxis(new THREE.Vector3(0, 0, 1), 0x0000ff, 150)); // Z
     scene.add(axesHelper);
 
     // Axis Labels
@@ -473,9 +615,16 @@ const init = () => {
     axesLabels.add(createLabel('Z', '#0000ff', new THREE.Vector3(0, 0, 160)));
     scene.add(axesLabels);
 
+    // Initial Sampling Line (Invisible)
+    const lineMat = new THREE.LineDashedMaterial({ color: 0xffff00, dashSize: 10, gapSize: 5 });
+    samplingLine = new THREE.Line(new THREE.BufferGeometry(), lineMat);
+    // samplingLine.computeLineDistances(); // Was causing crash on empty geometry
+    scene.add(samplingLine);
+
     generatePoints();
     generateShapeMesh();
     updateVisibility();
+    updateSamplingLine();
     
     animate();
 }
@@ -486,9 +635,24 @@ const init = () => {
 // Watchers
 let debounceTimer = null;
 
+watch([() => props.showGraph, graphAxis], () => {
+    updateSamplingLine();
+    updateVisibility();
+});
+
+watch(() => props.coords, (newVal) => {
+    if (newVal === 'cartesian') graphAxis.value = 'x';
+    else if (newVal === 'spherical') graphAxis.value = 'r';
+    else if (newVal === 'cylindrical') graphAxis.value = 'rho';
+    
+    // Immediate update for UI toggles
+    generatePoints();
+    generateShapeMesh();
+    updateVisibility();
+});
+
 watch([
     () => props.shape, 
-    () => props.coords, 
     () => props.cutMode,
     () => props.material
 ], () => {
@@ -504,10 +668,11 @@ watch(() => props.showAxis, updateVisibility);
 watch(() => props.distributionFunc, () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
+        compileFunction(); // Re-compile before re-generating
         generatePoints();
-        generateShapeMesh(); // Just in case function affects shape color (future)
+        generateShapeMesh(); 
         updateVisibility();
-    }, 800); // 800ms delay for smooth typing
+    }, 800); 
 });
 
 watch(() => props.showDistribution, updateVisibility);
@@ -518,6 +683,7 @@ watch(() => props.zoom, (val) => {
 
 onMounted(() => {
     nextTick(() => {
+        compileFunction(); // Compile initial function
         init();
         handleResize(); // Force initial size
         
@@ -553,8 +719,9 @@ onUnmounted(() => {
             <h4>Charge Density (ρ)</h4>
             <div class="gradient-bar"></div>
             <div class="labels">
-                <span>Low</span>
-                <span>High</span>
+                <span>Negative (-)</span>
+                <span style="color: #4ade80">Zero (0)</span>
+                <span>Positive (+)</span>
             </div>
         </div>
 
@@ -562,39 +729,54 @@ onUnmounted(() => {
         <transition name="pop">
             <div v-if="showGraph" class="graph-modal glass">
                 <div class="modal-header">
-                    <h3>Electric Field Distribution</h3>
-                    <button @click="$parent.handleGraphToggle" class="close-lite">✕</button>
+                    <h3>{{ graphYLabel }} Distribution</h3>
+                    
+                    <!-- Axis Selector (Moved from SVG) -->
+                    <div class="axis-selector">
+                        <label>Along Axis:</label>
+                        <select v-model="graphAxis" class="axis-select">
+                            <option v-for="opt in axisOptions" :key="opt.value" :value="opt.value">
+                                {{ opt.label.replace('Axis: ', '') }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <button @click="emit('toggle-graph')" class="close-lite">✕</button>
                 </div>
                 <div class="graph-placeholder">
                     <div class="mock-chart">
-                        <svg viewBox="0 0 400 220" style="overflow: visible;">
+                        <svg viewBox="-20 0 420 230" style="overflow: visible;">
                            <defs>
                                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                   <stop offset="0%" stop-color="#00d4ff" />
-                                   <stop offset="100%" stop-color="#ff0055" />
+                                   <stop v-for="stop in graphData.stops" :key="stop.offset" 
+                                         :offset="stop.offset" :stop-color="stop.color" />
                                </linearGradient>
                            </defs>
                            
                            <!-- Plot Line -->
-                           <path :d="graphPath" fill="none" stroke="url(#lineGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                           <path :d="graphData.path" fill="none" stroke="url(#lineGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
                            
                            <!-- Fill Area under curve -->
-                           <path :d="graphPath + ' L 350 180 L 50 180 Z'" fill="url(#lineGradient)" fill-opacity="0.1" stroke="none" />
+                           <path :d="graphData.path + ' L 350 180 L 50 180 Z'" fill="url(#lineGradient)" fill-opacity="0.1" stroke="none" v-if="graphData.minVal >= 0" />
 
                            <!-- Axes -->
-                           <line x1="50" y1="180" x2="350" y2="180" stroke="white" stroke-width="2" />
-                           <line x1="50" y1="20" x2="50" y2="180" stroke="white" stroke-width="2" />
+                           <line x1="50" y1="180" x2="350" y2="180" stroke="white" stroke-width="2" v-if="graphAxis === 'r' || (graphAxis !== 'r' && graphData.minVal >= 0)" />
+                           <line x1="50" y1="100" x2="350" y2="100" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="4" v-if="graphAxis !== 'r' && graphData.minVal < 0" />
+                           <line :x1="graphOriginX" y1="20" :x2="graphOriginX" y2="180" stroke="white" stroke-width="2" />
                            
                            <!-- Labels -->
-                           <text x="200" y="215" fill="#94a3b8" text-anchor="middle" font-size="14">Distance (r)</text>
-                           <text x="15" y="100" fill="#94a3b8" text-anchor="middle" font-size="14" transform="rotate(-90, 15, 100)">Charge Density (ρ)</text>
+                           <!-- Y Label -->
+                           <text x="0" y="100" fill="#94a3b8" text-anchor="middle" font-size="14" transform="rotate(-90, 0, 100)" font-weight="bold">
+                                {{ graphYLabel }}
+                           </text>
                            
                            <!-- Ticks -->
-                           <text x="45" y="180" fill="#64748b" text-anchor="end" font-size="10">0</text>
-                           <text x="45" y="195" fill="#64748b" text-anchor="end" font-size="10">Center</text>
-                           
-                           <text x="350" y="200" fill="#64748b" text-anchor="middle" font-size="10">Surface</text>
-                           <text x="40" y="30" fill="#64748b" text-anchor="end" font-size="10">max</text>
+                           <g v-for="tick in graphTicks" :key="tick.label + tick.x">
+                               <line :x1="tick.x" y1="180" :x2="tick.x" y2="185" stroke="white" stroke-width="1" />
+                               <text :x="tick.x" y="198" fill="#e2e8f0" text-anchor="middle" font-size="11" font-weight="bold">{{ tick.label }}</text>
+                               <text :x="tick.x" y="212" fill="#64748b" text-anchor="middle" font-size="10" v-if="tick.sub">{{ tick.sub }}</text>
+                           </g>
+                           <text :x="graphOriginX - 8" y="25" fill="#e2e8f0" text-anchor="end" font-size="11">MAX</text>
                         </svg>
                     </div>
                 </div>
@@ -681,9 +863,41 @@ canvas {
 }
 
 .glass {
-    background: rgba(15, 23, 42, 0.8);
+    background: rgba(15, 23, 42, 0.82);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.axis-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(30, 41, 59, 0.5);
+    padding: 0.2rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.axis-selector label {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.axis-select {
+    background: transparent;
+    color: #00d4ff;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: bold;
+    outline: none;
+    cursor: pointer;
+    min-width: 60px;
+}
+
+.axis-select option {
+    background: #1e293b;
+    color: #e2e8f0;
 }
 
 /* Animations */

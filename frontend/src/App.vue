@@ -12,11 +12,11 @@ const isLabMode = computed(() => route.path.includes('/lab') || route.path.inclu
 
 <template>
   <div class="app-layout">
-    <NavBar v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
+    <NavBar v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/electrostatics/dipole') && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
     
     <RouterView :activeExam="activeExam" />
   
-    <Footer v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" />
+    <Footer v-if="!isLabMode && !route.path.includes('/electrostatics/charges') && !route.path.includes('/electrostatics/dipole') && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" />
     
     <ProfileIcon />
   </div>

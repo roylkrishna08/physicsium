@@ -562,6 +562,7 @@ const updateCharge = (index, value) => {
                     :showDistribution="c3dShowDistribution"
                     :showAxis="c3dShowAxis"
                     :zoom="coulombZoom"
+                    @toggle-graph="handleGraphToggle"
                 />
             </transition>
         </div>
