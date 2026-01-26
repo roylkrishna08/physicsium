@@ -60,9 +60,14 @@ const router = createRouter({
                 { path: 'charges', name: 'charges', component: ChargesAndFields },
                 { path: 'dipole', name: 'dipole', component: FieldAndDipole },
                 { path: 'gauss', name: 'gauss', component: GaussLaw },
+                { path: 'gausslaw', name: 'gauss-law-new', component: GaussLaw },
                 { path: 'potential', name: 'potential', component: Potential },
                 { path: 'capacitors', name: 'capacitors', component: Capacitors }
             ]
+        },
+        {
+            path: '/electrostatic/gausslaw',
+            redirect: '/electrostatics/gausslaw'
         },
         {
             path: '/gravitation',

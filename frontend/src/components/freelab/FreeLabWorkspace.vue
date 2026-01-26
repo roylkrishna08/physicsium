@@ -1,5 +1,5 @@
 <script setup>
-import { ref, defineExpose, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import DraggableApparatus from './DraggableApparatus.vue'
 
 // State

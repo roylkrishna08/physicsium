@@ -205,4 +205,38 @@ defineEmits(['toggleLeftSidebar', 'toggleRightSidebar', 'toggleDrawing'])
 .pen-icon {
     font-size: 1.2rem;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .lab-navbar {
+        padding: 0.5rem 1rem;
+    }
+
+    .brand .logo {
+        font-size: 1.2rem;
+    }
+
+    .brand .lab-badge {
+        display: none; /* Hide badge to save space */
+    }
+
+    .experiment-name {
+        font-size: 0.9rem;
+        display: none; /* Hide in favor of logo/exit on very small or just simplify */
+    }
+    
+    /* If we want to keep experiment name, maybe hide brand logo */
+}
+
+@media (max-width: 480px) {
+    .exit-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
+    
+    .hamburger-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
 </style>

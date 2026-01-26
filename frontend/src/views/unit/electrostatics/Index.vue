@@ -26,7 +26,7 @@ const syllabusPoints = [
   {
     title: "Gauss's Law",
     content: "Electric flux, Gauss's law applications: infinite wire, infinite plane sheet, thin spherical shell.",
-    route: '/electrostatics/gauss',
+    route: '/electrostatics/gausslaw',
     icon: '🌐',
     color: '#00ff9d'
   },

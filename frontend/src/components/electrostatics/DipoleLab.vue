@@ -11,8 +11,10 @@ import DrawingSidebar from '../drawingTool/DrawingSidebar.vue'
 const router = useRouter()
 
 // UI State
-const sidebarOpen = ref(true)
-const controlsOpen = ref(true)
+// UI State
+const isMobile = window.innerWidth < 768
+const sidebarOpen = ref(!isMobile)
+const controlsOpen = ref(!isMobile)
 const drawingActive = ref(false)
 const drawingSidebarOpen = ref(false)
 
@@ -34,6 +36,9 @@ const topics = [
 const showGrid = ref(false)
 const showFieldLines = ref(false)
 const showVectors = ref(false)    // New: show force/field vectors
+const momentOfInertia = ref(2)
+const dampingFactor = ref(0.2)
+const showEquilibrium = ref(true)
 const isAnimating = ref(false)
 
 // Point Charge State
@@ -69,11 +74,30 @@ const clearTestCharges = () => {
 }
 
 // Dipole State
+const dipoles = ref([
+    { id: Date.now(), q: 1, sep: 100, x: null, y: null, phi: 0 }
+])
 const dipoleCharge = ref(1)
 const dipoleSeparation = ref(100) // pixels roughly cm
 
+const addDipole = () => {
+    dipoles.value.push({
+        id: Date.now(),
+        q: dipoleCharge.value,
+        sep: dipoleSeparation.value,
+        x: null,
+        y: null,
+        phi: 0
+    })
+}
+
+const removeDipole = (index) => {
+    dipoles.value.splice(index, 1)
+}
+
 // Torque State
 const electricFieldStrength = ref(5) // N/C * scale
+const electricFieldAngle = ref(0) // Fixed to 0 for left-to-right
 const torqueDipoleMoment = ref(5) // p scale
 const dipoleAngle = ref(45) // degrees
 
@@ -104,6 +128,13 @@ const handleTopicSelect = (topicId) => {
     if (topicId === 'point_charge') {
         // Optional: Reset logic if needed
     }
+}
+
+const handleResetDipole = () => {
+    // We can't directly reset dipoleCenter in simulation if it's not a prop,
+    // but we can trigger a re-mount or a reset event if implemented.
+    // For now, let's just refresh the page or topic.
+    // OR we could pass it as a prop. Let's make it a prop to be safe.
 }
 
 // Layout logic
@@ -150,7 +181,7 @@ const viewportStyle = computed(() => ({
                 </label>
                 <label class="toggle-label">
                     <input type="checkbox" v-model="showFieldLines">
-                    Show Field Lines
+                    Show Electric Field
                 </label>
                  <label class="toggle-label">
                     <input type="checkbox" v-model="showVectors">
@@ -191,36 +222,83 @@ const viewportStyle = computed(() => ({
                 </div>
             </div>
 
-            <!-- Dipole Field Controls -->
             <div v-if="activeTopic === 'dipole_field'" class="sidebar-controls">
                 <h3>Electric Dipole</h3>
                 <div class="control-group">
-                    <label class="slider-label">Charge Magnitude q ({{dipoleCharge}} µC)</label>
-                    <input type="range" v-model.number="dipoleCharge" min="0.5" max="5" step="0.5" class="range-slider">
+                    <label class="slider-label">Global Charge (p)</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="range" v-model.number="dipoleCharge" min="1" max="10" step="0.5" class="range-slider" @input="dipoles.forEach(d => d.q = dipoleCharge)">
+                        <input type="number" v-model.number="dipoleCharge" step="0.5" class="input-text" style="width: 70px;" @input="dipoles.forEach(d => d.q = dipoleCharge)">
+                    </div>
                 </div>
+                <div class="control-group" style="margin-bottom: 2rem;">
+                    <label class="slider-label">Global Separation 2a (px)</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="range" v-model.number="dipoleSeparation" min="50" max="400" step="10" class="range-slider" @input="dipoles.forEach(d => d.sep = dipoleSeparation)">
+                        <input type="number" v-model.number="dipoleSeparation" step="10" class="input-text" style="width: 70px;" @input="dipoles.forEach(d => d.sep = dipoleSeparation)">
+                    </div>
+                </div>
+
                 <div class="control-group">
-                    <label class="slider-label">Separation 2a ({{dipoleSeparation}} px)</label>
-                    <input type="range" v-model.number="dipoleSeparation" min="50" max="300" step="10" class="range-slider">
+                     <button class="btn-action" @click="addDipole">+ Add New Dipole</button>
+                </div>
+
+                <div v-if="dipoles.length > 0" class="control-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
+                    <h3>Active Dipoles</h3>
+                    <div v-for="(d, idx) in dipoles" :key="d.id" class="indicator-row" style="margin-bottom: 8px; align-items: center; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px;">
+                        <span>Dipole #{{ idx + 1 }}</span>
+                        <button class="btn-action" style="margin-top:0; width: 30px; padding: 4px; background: #64748b;" @click="removeDipole(idx)">×</button>
+                    </div>
+                </div>
+
+                <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
+                    <h3>Test Charges (q0)</h3>
+                    <p class="description" style="margin-bottom: 0.5rem">
+                         Release a positive test charge to visualize the field line path.
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-action" style="margin-top:0; flex: 1; background: #ea580c;" @click="addTestCharge">
+                            Release q0
+                        </button>
+                         <button class="btn-action" style="margin-top:0; width: 40px; background: #64748b;" @click="clearTestCharges" title="Clear All q0">
+                            ×
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Torque Controls -->
             <div v-if="activeTopic === 'torque'" class="sidebar-controls">
                 <h3>Torque in Uniform Field</h3>
                 <div class="control-group">
-                    <label class="slider-label">Electric Field (E): {{electricFieldStrength}} N/C</label>
-                    <input type="range" v-model.number="electricFieldStrength" min="1" max="10" class="range-slider">
+                    <label class="slider-label">Electric Field (E)</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="range" v-model.number="electricFieldStrength" min="1" max="10" class="range-slider">
+                        <input type="number" v-model.number="electricFieldStrength" step="0.5" class="input-text" style="width: 60px;">
+                    </div>
                 </div>
-                 <div class="control-group">
-                    <label class="slider-label">Dipole Moment (p)</label>
-                    <input type="range" v-model.number="torqueDipoleMoment" min="1" max="10" class="range-slider">
+                  <div class="control-group">
+                    <label class="slider-label">Angle (θ) - Degrees</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="range" v-model.number="dipoleAngle" min="0" max="360" class="range-slider">
+                        <input type="number" v-model.number="dipoleAngle" class="input-text" style="width: 60px;">
+                    </div>
                 </div>
-                 <div class="control-group">
-                    <label class="slider-label">Angle (θ): {{dipoleAngle}}°</label>
-                    <input type="range" v-model.number="dipoleAngle" min="0" max="360" class="range-slider">
+                <div class="control-group">
+                    <label class="slider-label">Damping (Friction)</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="range" v-model.number="dampingFactor" min="0" max="2" step="0.1" class="range-slider">
+                        <input type="number" v-model.number="dampingFactor" step="0.1" class="input-text" style="width: 60px;">
+                    </div>
                 </div>
-                <button class="btn-action" @click="isAnimating = !isAnimating">
-                    {{ isAnimating ? 'Pause' : 'Release Dipole' }}
+                <div class="control-group checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" v-model="showEquilibrium">
+                        <span class="checkmark"></span>
+                        Show Equilibrium Points
+                    </label>
+                </div>
+                <button class="btn-action" @click="isAnimating = !isAnimating" :style="{ background: isAnimating ? '#ef4444' : '#10b981' }">
+                    {{ isAnimating ? 'Stop Animation' : 'Release Dipole' }}
                 </button>
             </div>
 
@@ -228,20 +306,28 @@ const viewportStyle = computed(() => ({
 
         <div class="lab-viewport" :style="viewportStyle">
             <DipoleSimulation 
+                ref="simRef"
+                v-if="activeTopic === 'dipole_field' || activeTopic === 'torque' || activeTopic === 'point_charge'"
                 :mode="activeTopic"
                 :show-grid="showGrid"
                 :show-field-lines="showFieldLines"
                 :show-vectors="showVectors"
-                :play-animation="isAnimating"
                 :charges="pointCharges"
                 @update:charges="pointCharges = $event"
+                :dipoles="dipoles"
+                @update:dipoles="dipoles = $event"
                 :test-charges="testCharges"
                 @update:test-charges="testCharges = $event"
                 :dipole-q="dipoleCharge"
-                :dipole-sev="dipoleSeparation"
+                :dipole-sep="dipoleSeparation"
                 :torque-e="electricFieldStrength"
+                :torque-e-angle="electricFieldAngle"
                 :torque-p="torqueDipoleMoment"
                 :torque-angle="dipoleAngle"
+                :play-animation="isAnimating"
+                :damping="dampingFactor"
+                :inertia="momentOfInertia"
+                :show-equilibrium="showEquilibrium"
                 @update:angle="dipoleAngle = $event" 
             />
         </div>
@@ -426,5 +512,34 @@ const viewportStyle = computed(() => ({
     font-size: 0.75rem;
     color: #64748b;
     margin-top: 4px;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    :deep(.lab-sidebar-container),
+    :deep(.control-sidebar-container) {
+        width: 280px !important; /* Slightly narrower on mobile */
+    }
+
+    .description {
+        font-size: 0.8rem;
+        padding: 6px;
+    }
+
+    .control-group {
+        padding: 0.8rem;
+    }
+
+    .btn-action {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    :deep(.lab-sidebar-container),
+    :deep(.control-sidebar-container) {
+        width: 100% !important; /* Full width on tiny screens when open */
+    }
 }
 </style>

@@ -206,7 +206,7 @@ const toggleSidebar = () => {
   backdrop-filter: blur(25px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 40px; /* Pill shape */
-  z-index: 100;
+  z-index: 200;
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   padding: 1rem 0.6rem;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
