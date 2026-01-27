@@ -57,16 +57,20 @@ const router = createRouter({
             path: '/electrostatics',
             children: [
                 { path: '', name: 'electrostatics-index', component: ElectrostaticsIndex },
-                { path: 'charges', name: 'charges', component: ChargesAndFields },
-                { path: 'dipole', name: 'dipole', component: FieldAndDipole },
-                { path: 'gauss', name: 'gauss', component: GaussLaw },
-                { path: 'gausslaw', name: 'gauss-law-new', component: GaussLaw },
-                { path: 'potential', name: 'potential', component: Potential },
-                { path: 'capacitors', name: 'capacitors', component: Capacitors }
+                { path: 'charges', name: 'charges', component: ChargesAndFields, meta: { hideNav: true } },
+                { path: 'dipole', name: 'dipole', component: FieldAndDipole, meta: { hideNav: true } },
+                { path: 'gauss', name: 'gauss', component: GaussLaw, meta: { hideNav: true } },
+                { path: 'gausslaw', name: 'gausslaw', component: GaussLaw, meta: { hideNav: true } },
+                { path: 'potential', name: 'potential', component: Potential, meta: { hideNav: true } },
+                { path: 'capacitors', name: 'capacitors', component: Capacitors, meta: { hideNav: true } }
             ]
         },
         {
             path: '/electrostatic/gausslaw',
+            redirect: '/electrostatics/gausslaw'
+        },
+        {
+            path: '/gausslaw',
             redirect: '/electrostatics/gausslaw'
         },
         {

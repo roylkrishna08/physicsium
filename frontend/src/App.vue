@@ -7,16 +7,20 @@ import ProfileIcon from './components/layout/ProfileIcon.vue'
 
 const activeExam = ref('JEE')
 const route = useRoute()
-const isLabMode = computed(() => route.path.includes('/lab') || route.path.includes('/freelab'))
+const isLabMode = computed(() => {
+    return route.path.includes('/lab') || 
+           route.path.includes('/freelab') || 
+           route.meta.hideNav
+})
 </script>
 
 <template>
   <div class="app-layout">
-    <NavBar v-if="!isLabMode && route.path !== '/electrostatics/gauss' && route.path !== '/electrostatics/gausslaw' && route.name !== 'charges' && route.name !== 'dipole' && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
+    <NavBar v-if="!isLabMode && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" :activeExam="activeExam" @update:activeExam="activeExam = $event" />
     
     <RouterView :activeExam="activeExam" />
   
-    <Footer v-if="!isLabMode && route.path !== '/electrostatics/gauss' && route.path !== '/electrostatics/gausslaw' && route.name !== 'charges' && route.name !== 'dipole' && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" />
+    <Footer v-if="!isLabMode && !route.path.includes('/gravitation') && route.name !== 'jee-mains-topic-questions'" />
     
     <ProfileIcon />
   </div>

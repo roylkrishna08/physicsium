@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ChargeSidebar from './ChargeSidebar.vue'
 import ControlSidebar from './ControlSidebar.vue'
@@ -47,6 +47,7 @@ const handleClearDrawing = () => {
 
 const topics = [
     { id: 'flux', label: "Electric Flux" },
+    { id: 'solid_angle', label: "Solid Angle" },
     { id: 'wire', label: "Infinite Wire" },
     { id: 'sheet', label: "Infinite Plane Sheet" },
     { id: 'shell', label: "Thin Spherical Shell" }
@@ -65,12 +66,37 @@ const viewportStyle = computed(() => ({
 }))
 
 // Lab parameters
-const showGrid = ref(false)
 const zoom = ref(1.0)
 const chargeValue = ref(10) // General charge or linear/surface density
 const surfaceType = ref('spherical') // spherical, cylindrical, box
 const surfaceRadius = ref(100)
-const surfaceLength = ref(200)
+const surfaceLength = ref(200) // Wire length or Sheet size
+const shellRadius = ref(80)
+const showFormulas = ref(true)
+
+// Charge Position (for Flux topic)
+const chargePos = ref({ x: 0, y: 0, z: 0 })
+
+// Solid Angle Extra state
+const solidAngleDirection = ref({ phi: 0, theta: 0 })
+const showSecondary = ref(true)
+const autoScan = ref(false)
+
+let scanInterval = null
+watch(autoScan, (val) => {
+    if (val) {
+        scanInterval = setInterval(() => {
+            solidAngleDirection.value.phi = (solidAngleDirection.value.phi + 0.5) % 360
+            solidAngleDirection.value.theta = Math.sin(Date.now() / 2000) * 45
+        }, 30)
+    } else {
+        clearInterval(scanInterval)
+    }
+})
+
+onUnmounted(() => {
+    if (scanInterval) clearInterval(scanInterval)
+})
 
 // Visibility Toggles
 const showSurface = ref(true)
@@ -89,10 +115,38 @@ const resetZoom = () => {
     zoom.value = 1.0
 }
 
+const isInside = computed(() => {
+    if (activeTopic.value !== 'flux') return true
+    
+    const { x, y, z } = chargePos.value
+    const distSq = x*x + y*y + z*z
+    const R = surfaceRadius.value
+    
+    if (surfaceType.value === 'spherical') {
+        return Math.sqrt(distSq) <= R
+    } else if (surfaceType.value === 'cylindrical') {
+        const rho = Math.sqrt(x*x + z*z)
+        return rho <= R && Math.abs(y) <= 175 // 350/2 is hardcoded height in simulation
+    } else {
+        return Math.abs(x) <= R && Math.abs(y) <= R && Math.abs(z) <= R
+    }
+})
+
+const EPSILON_0 = 8.854e-12
+const fluxValue = computed(() => {
+    if (activeTopic.value === 'shell') {
+        return surfaceRadius.value >= shellRadius.value ? chargeValue.value : 0
+    }
+    if (activeTopic.value === 'flux') {
+        return isInside.value ? chargeValue.value : 0
+    }
+    return chargeValue.value
+})
+
 </script>
 
 <template>
-    <div class="gauss-lab">
+    <div class="gauss-lab" :class="{ 'sidebar-collapsed': !sidebarOpen, 'controls-collapsed': !controlsOpen }">
         <ElectrostaticsNavBar 
             experiment-name="Gauss's Law Lab" 
             @toggleLeftSidebar="toggleSidebar"
@@ -132,8 +186,8 @@ const resetZoom = () => {
                         Show Field Lines
                     </label>
                     <label class="toggle-label">
-                        <input type="checkbox" v-model="showGrid">
-                        Show Gridlines
+                        <input type="checkbox" v-model="showFormulas">
+                        Show Theory & Data
                     </label>
                 </div>
                 <div v-if="activeTopic === 'flux'" class="topic-controls">
@@ -152,8 +206,44 @@ const resetZoom = () => {
                     </div>
                     <div class="control-group">
                         <label class="slider-label">Surface Radius: {{surfaceRadius}} px</label>
-                        <input type="range" v-model.number="surfaceRadius" min="50" max="200" step="10" class="range-slider">
+                        <input type="range" v-model.number="surfaceRadius" min="50" max="250" step="10" class="range-slider">
                     </div>
+                    <div class="control-group">
+                        <h4 style="margin: 0.5rem 0 0.2rem; font-size: 0.8rem; color: #94a3b8;">Charge Position</h4>
+                        <label class="slider-label">X: {{chargePos.x}}</label>
+                        <input type="range" v-model.number="chargePos.x" min="-250" max="250" step="5" class="range-slider">
+                        <label class="slider-label">Y: {{chargePos.y}}</label>
+                        <input type="range" v-model.number="chargePos.y" min="-250" max="250" step="5" class="range-slider">
+                        <label class="slider-label">Z: {{chargePos.z}}</label>
+                        <input type="range" v-model.number="chargePos.z" min="-250" max="250" step="5" class="range-slider">
+                    </div>
+                </div>
+                
+                <div v-if="activeTopic === 'solid_angle'" class="topic-controls">
+                    <h3>Solid Angle (Ω)</h3>
+                    <div class="control-group">
+                        <label class="slider-label">Aperture Angle (θ/2): {{chargeValue}}°</label>
+                        <input type="range" v-model.number="chargeValue" min="5" max="175" step="1" class="range-slider">
+                    </div>
+                    <div class="control-group">
+                        <label class="slider-label">Radius (r): {{surfaceRadius}} px</label>
+                        <input type="range" v-model.number="surfaceRadius" min="50" max="350" step="10" class="range-slider">
+                    </div>
+                    <div class="control-group">
+                        <h4 style="margin: 0.5rem 0 0.2rem; font-size: 0.8rem; color: #94a3b8;">Direction</h4>
+                        <label class="slider-label">Azimuth: {{solidAngleDirection.phi}}°</label>
+                        <input type="range" v-model.number="solidAngleDirection.phi" min="0" max="360" step="1" class="range-slider">
+                        <label class="slider-label">Elevation: {{solidAngleDirection.theta}}°</label>
+                        <input type="range" v-model.number="solidAngleDirection.theta" min="-90" max="90" step="1" class="range-slider">
+                    </div>
+                    <label class="toggle-label">
+                        <input type="checkbox" v-model="showSecondary">
+                        Show Concentric Layers
+                    </label>
+                    <label class="toggle-label" style="margin-top: 5px; color: #00ff9d;">
+                        <input type="checkbox" v-model="autoScan">
+                        Auto-Scan Mode (Demo)
+                    </label>
                 </div>
 
                 <div v-if="activeTopic === 'wire'" class="topic-controls">
@@ -166,6 +256,10 @@ const resetZoom = () => {
                         <label class="slider-label">Gaussian Radius (r): {{surfaceRadius}} px</label>
                         <input type="range" v-model.number="surfaceRadius" min="30" max="150" step="5" class="range-slider">
                     </div>
+                    <div class="control-group">
+                        <label class="slider-label">Wire Length: {{surfaceLength}} px</label>
+                        <input type="range" v-model.number="surfaceLength" min="200" max="800" step="50" class="range-slider">
+                    </div>
                 </div>
 
                 <div v-if="activeTopic === 'sheet'" class="topic-controls">
@@ -173,6 +267,10 @@ const resetZoom = () => {
                     <div class="control-group">
                         <label class="slider-label">Surface Charge Density (σ): {{chargeValue}} nC/m²</label>
                         <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
+                    </div>
+                    <div class="control-group">
+                        <label class="slider-label">Sheet Size: {{surfaceLength}} px</label>
+                        <input type="range" v-model.number="surfaceLength" min="400" max="1500" step="100" class="range-slider">
                     </div>
                 </div>
 
@@ -183,8 +281,8 @@ const resetZoom = () => {
                         <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
                     </div>
                     <div class="control-group">
-                        <label class="slider-label">Shell Radius (R): {{80}} px</label>
-                        <!-- Shell radius fixed for simplicity in this interactive -->
+                        <label class="slider-label">Shell Radius (R): {{shellRadius}} px</label>
+                        <input type="range" v-model.number="shellRadius" min="40" max="120" step="5" class="range-slider">
                     </div>
                     <div class="control-group">
                         <label class="slider-label">Gaussian Radius (r): {{surfaceRadius}} px</label>
@@ -202,17 +300,23 @@ const resetZoom = () => {
         <div class="lab-viewport" :style="viewportStyle">
             <GaussLawSimulation 
                 :active-topic="activeTopic"
-                :show-grid="showGrid"
                 :zoom="zoom"
                 :charge="chargeValue"
+                :charge-pos="chargePos"
+                :solid-angle-dir="solidAngleDirection"
+                @update:solid-angle-dir="solidAngleDirection = $event"
+                :show-secondary="showSecondary"
                 :surface-type="surfaceType"
                 :surface-radius="surfaceRadius"
                 :surface-length="surfaceLength"
+                :shell-radius="shellRadius"
                 :show-surface="showSurface"
                 :show-lines="showLines"
                 :show-source="showSource"
+                :drawing-active="drawingActive"
             />
 
+            <!-- Viewport contains only simulation and controls now -->
             <!-- Zoom Controls -->
             <div class="zoom-controls">
                 <button @click="zoomIn" title="Zoom In">+</button>
@@ -249,7 +353,7 @@ const resetZoom = () => {
     bottom: 0;
     width: 100%;
     overflow: hidden;
-    background: #0f172a;
+    background: radial-gradient(circle at center, #0a0614 0%, #000 100%);
     display: flex;
     flex-direction: column;
 }
@@ -288,6 +392,25 @@ const resetZoom = () => {
 .slider-label {
     font-size: 0.9rem;
     color: #94a3b8;
+}
+
+.status-indicator {
+    margin-top: 1rem;
+    padding: 8px;
+    text-align: center;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-indicator.inside {
+    background: rgba(0, 255, 157, 0.1);
+    color: #00ff9d;
+    border: 1px solid rgba(0, 255, 157, 0.2);
 }
 
 .range-slider {
@@ -367,10 +490,88 @@ const resetZoom = () => {
     transform: scale(0.95);
 }
 
+/* Info Overlays */
+.info-overlay {
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.top-left {
+    top: 80px;
+    left: 340px; /* Offset for sidebar */
+    transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sidebar-collapsed .top-left {
+    left: 20px;
+}
+
+/* Data cards styling */
+.data-card, .formula-card {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 20px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.data-card .label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.data-card .value {
+    font-size: 1.5rem;
+    color: #00ff9d;
+    font-weight: 700;
+}
+
+.data-card .value small {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.formula-card {
+    align-items: center;
+    border-left: 3px solid #00ff9d;
+}
+
+.description-card {
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    border-radius: 12px;
+    max-width: 300px;
+}
+
+.description-card p {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.math-font {
+    font-family: 'Cambria Math', 'serif';
+    font-style: italic;
+    font-size: 1.1rem;
+    color: #e2e8f0;
+}
+
 @media (max-width: 768px) {
-    .zoom-controls {
-        bottom: 100px;
-        gap: 12px;
+    .top-left {
+        left: 20px;
+        top: 70px;
     }
 }
 </style>

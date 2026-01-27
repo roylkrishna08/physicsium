@@ -14,6 +14,6 @@ defineProps(['activeExam'])
     width: 100%;
     height: 100vh;
     position: relative;
-    background: #0f172a; 
+    overflow: hidden;
 }
 </style>
