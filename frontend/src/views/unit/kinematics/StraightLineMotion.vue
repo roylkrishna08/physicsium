@@ -1,5 +1,5 @@
 <template>
-  <TopicPlaceholder topicTitle="Motion in a Straight Line" />
+  <TopicPlaceholder topicTitle="Straight Line Motion" />
 </template>
 
 <script setup>

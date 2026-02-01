@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ChargeSidebar from './ChargeSidebar.vue'
-import ControlSidebar from './ControlSidebar.vue'
+import ControlSidebar from '../ui/ControlSidebar.vue'
 import ElectrostaticsNavBar from './ElectrostaticsNavBar.vue'
 import ConservationLab from './labs/ConservationLab.vue'
 import CoulombLab from './labs/CoulombLab.vue'

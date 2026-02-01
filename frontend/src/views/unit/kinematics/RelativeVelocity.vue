@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import KinematicsNavBar from '../../../components/kinematics/KinematicsNavBar.vue'
 import RelativeVelocitySidebar from '../../../components/kinematics/RelativeVelocitySidebar.vue'
 import RelativeVelocityControls from '../../../components/kinematics/RelativeVelocityControls.vue'
-import ControlSidebar from '../../../components/electrostatics/ControlSidebar.vue'
+import ControlSidebar from '../../../components/ui/ControlSidebar.vue'
 import RelativeVelocityLab from '../../../components/kinematics/labs/RelativeVelocityLab.vue'
 
 const sidebarOpen = ref(true)
@@ -21,7 +21,11 @@ const showGrid = ref(true)
 const zoom = ref(1)
 const objects = ref([])
 const selectedObjectId = ref(null)
-
+// Rain State
+const rainSpeed = ref(10)
+const manualUmbrella = ref(false)
+const umbrellaAngle = ref(0)
+const showTheta = ref(true) // New state for Theta Calculation visibility
 const labRef = ref(null)
 
 const scenarios = [
@@ -87,6 +91,10 @@ const handleAddBall = () => {
         v-model:showGrid="showGrid"
         :objects="objects"
         v-model:selectedObjectId="selectedObjectId"
+        v-model:rainSpeed="rainSpeed"
+        v-model:manualUmbrella="manualUmbrella"
+        v-model:umbrellaAngle="umbrellaAngle"
+        v-model:showTheta="showTheta"
         @reset="handleReset"
         @addBall="handleAddBall"
       />
@@ -106,6 +114,10 @@ const handleAddBall = () => {
         :visualTheme="visualTheme"
         :show-vectors="showVectors"
         :show-grid="showGrid"
+        :rainSpeed="rainSpeed"
+        :manualUmbrella="manualUmbrella"
+        :umbrellaAngle="umbrellaAngle"
+        :showTheta="showTheta"
         v-model:zoom="zoom"
       />
     </main>

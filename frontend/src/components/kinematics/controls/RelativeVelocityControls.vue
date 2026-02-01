@@ -13,11 +13,7 @@ const props = defineProps({
   showGrid: Boolean,
   objects: Array,
   selectedObjectId: [String, Number, null],
-  // Rain Props
-  rainSpeed: { type: Number, default: 10 },
-  manualUmbrella: { type: Boolean, default: false },
-  umbrellaAngle: { type: Number, default: 0 },
-  showTheta: { type: Boolean, default: true }
+  presets: Array
 })
 
 const emit = defineEmits([
@@ -32,10 +28,7 @@ const emit = defineEmits([
   'reset',
   'addBall',
   'update:selectedObjectId',
-  'update:rainSpeed',
-  'update:manualUmbrella',
-  'update:umbrellaAngle',
-  'update:showTheta'
+  'applyPreset'
 ])
 
 // Computed umbrella angle for Rain scenario
@@ -70,6 +63,22 @@ const deleteObject = () => {
 
 <template>
   <div class="controls-content">
+    <!-- JEE Question Presets -->
+    <div class="control-group" v-if="presets && presets.length > 0">
+      <div class="group-header">
+        <span class="group-title">JEE Question Presets</span>
+      </div>
+      <div class="presets-grid">
+        <button 
+          v-for="preset in presets" 
+          :key="preset.label"
+          class="preset-btn"
+          @click="emit('applyPreset', preset)"
+        >
+          {{ preset.label }}
+        </button>
+      </div>
+    </div>
     <div class="control-group" v-if="mode !== 'rain'">
       <div class="frame-selector">
         <button 
@@ -107,7 +116,7 @@ const deleteObject = () => {
     <div class="control-group" v-if="mode === 'rain'">
         <div class="slider-item">
             <div class="slider-header">
-                <span class="label">Man Speed (V<sub>m</sub>)</span>
+                <span class="label">Man Speed</span>
                 <input type="number" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="0" :max="15" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="range-slider">
@@ -115,7 +124,7 @@ const deleteObject = () => {
 
         <div class="slider-item">
             <div class="slider-header">
-                <span class="label">Wind Speed (V<sub>r,x</sub>)</span>
+                <span class="label">Air Speed (Wind)</span>
                 <input type="number" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="-15" :max="15" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
@@ -125,49 +134,67 @@ const deleteObject = () => {
                 <span>Right &gt;</span>
             </div>
         </div>
-
-        <div class="slider-item">
-            <div class="slider-header">
-                 <span class="label">Rain Speed (V<sub>r,y</sub>)</span>
-                 <input type="number" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="number-input small">
-            </div>
-            <input type="range" :min="5" :max="25" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="range-slider">
-        </div>
         
-        <div class="control-group-inner" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
-            <label class="toggle-item" style="margin-bottom: 1rem;">
-                <input type="checkbox" :checked="manualUmbrella" @change="emit('update:manualUmbrella', $event.target.checked)">
-                <span class="toggle-label">Manual Umbrella Control</span>
-            </label>
-
-            <div class="slider-item" :style="{ opacity: manualUmbrella ? 1 : 0.6, pointerEvents: manualUmbrella ? 'auto' : 'none' }">
-                <div class="slider-header">
-                    <span class="label">Umbrella Angle</span>
-                    <input type="number" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', parseFloat($event.target.value))" class="number-input small" :readonly="!manualUmbrella">
-                </div>
-                <input type="range" :min="-90" :max="90" step="1" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', parseFloat($event.target.value))" class="range-slider">
-                 <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px; text-align: center;" v-if="!manualUmbrella">
-                    (Auto-calculated to keep dry)
-                </div>
+        <!-- Umbrella Angle (Read-only, calculated) -->
+        <div class="slider-item" style="opacity: 0.8;">
+            <div class="slider-header">
+                <span class="label">Umbrella Angle</span>
+                <input type="text" :value="umbrellaAngleDisplay" readonly class="number-input small" style="background: rgba(255,255,255,0.05); cursor: default;">
+            </div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px; text-align: center;">
+                tan(θ) = (V<sub>rain_x</sub> - V<sub>man</sub>) / V<sub>rain_y</sub>
             </div>
         </div>
     </div>
 
-    <div class="control-group" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter'].includes(mode)">
+    <div class="control-group" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter', '1d'].includes(mode)">
+        <div class="slider-item">
+            <div class="slider-header">
+                <span class="label">{{ 
+                    mode === 'river' ? 'Boat Speed' : 
+                    mode === 'aeroplane' ? 'Airspeed' : 
+                    mode === 'flag-flutter' ? 'Man Speed' :
+                    mode === '1d' ? 'Speed A' : 'Speed A' 
+                }}</span>
+                <input type="number" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="number-input small">
+            </div>
+            <input type="range" :min="0" :max="mode === 'aeroplane' ? 500 : (mode === '1d' ? 100 : 50)" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="range-slider">
+        </div>
+
+        <div class="slider-item" v-if="mode !== 'flag-flutter'">
+            <div class="slider-header">
+                <span class="label">{{ 
+                    mode === 'river' ? 'River Velocity' : 
+                    mode === 'aeroplane' ? 'Wind Speed' : 
+                    mode === '1d' ? 'Speed B' : 'Speed B' 
+                }}</span>
+                <input type="number" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="number-input small">
+            </div>
+            <input type="range" :min="0" :max="mode === 'aeroplane' ? 200 : (mode === '1d' ? 100 : 50)" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
+        </div>
+
         <div class="slider-item" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance'].includes(mode)">
             <div class="slider-header">
-                <span class="label">{{ mode === 'river' ? 'Boat Angle' : 'Angle A' }}</span>
+                <span class="label">{{ mode === 'river' ? 'Boat Heading' : (mode === 'aeroplane' ? 'Plane Heading' : 'Initial Angle A') }}</span>
                 <input type="number" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="0" :max="360" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="range-slider">
         </div>
 
-        <div class="slider-item" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter'].includes(mode)">
+        <div class="slider-item" v-if="['aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter'].includes(mode)">
             <div class="slider-header">
-                <span class="label">{{ mode === 'flag-flutter' ? 'Wind Angle' : 'Angle B' }}</span>
+                <span class="label">{{ mode === 'flag-flutter' ? 'Wind Direction' : (mode === 'aeroplane' ? 'Wind Direction' : 'Initial Angle B') }}</span>
                 <input type="number" step="1" :value="angle2" @input="emit('update:angle2', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="0" :max="360" step="1" :value="angle2" @input="emit('update:angle2', parseFloat($event.target.value))" class="range-slider">
+        </div>
+
+        <div class="slider-item" v-if="mode === 'flag-flutter'">
+            <div class="slider-header">
+                <span class="label">Wind Magnitude</span>
+                <input type="number" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="number-input small">
+            </div>
+            <input type="range" :min="0" :max="20" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
         </div>
     </div>
 
@@ -180,11 +207,6 @@ const deleteObject = () => {
         <label class="toggle-item">
             <input type="checkbox" :checked="showGrid" @change="emit('update:showGrid', $event.target.checked)">
             <span class="toggle-label">Show Grid Lines</span>
-        </label>
-
-        <label class="toggle-item" v-if="mode === 'rain'">
-            <input type="checkbox" :checked="showTheta" @change="emit('update:showTheta', $event.target.checked)">
-            <span class="toggle-label">Show Theta Calculation</span>
         </label>
     </div>
 
@@ -435,6 +457,29 @@ const deleteObject = () => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+}
+
+.presets-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.preset-btn {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.preset-btn:hover {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--primary-glow);
+    color: var(--primary-glow);
 }
 
 .btn-close-selection {

@@ -1,5 +1,5 @@
 <template>
-  <TopicPlaceholder topicTitle="Uniform Circular Motion" />
+  <TopicPlaceholder topicTitle="Circular Motion" />
 </template>
 
 <script setup>

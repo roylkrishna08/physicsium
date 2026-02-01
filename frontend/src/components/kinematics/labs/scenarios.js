@@ -147,14 +147,64 @@ export const scenarios = {
                     color: '#00d4ff',
                     label: 'Rain',
                     type: 'rain'
-                }
+                },
+                // Background Clouds for Air Motion Visual
+                { id: 'Cloud1', x: cx - 300, y: cy - 250, vx: props.v2, scale: 0.8, type: 'cloud' },
+                { id: 'Cloud2', x: cx + 200, y: cy - 280, vx: props.v2, scale: 1.2, type: 'cloud' },
+                { id: 'Cloud3', x: cx - 100, y: cy - 350, vx: props.v2, scale: 0.6, type: 'cloud' },
+                { id: 'Cloud4', x: cx + 400, y: cy - 220, vx: props.v2, scale: 0.9, type: 'cloud' },
+                { id: 'Cloud5', x: cx - 400, y: cy - 300, vx: props.v2, scale: 0.7, type: 'cloud' }
             ]
         },
         update: (objects, dt, props) => {
             const man = objects.value[0]
             const rain = objects.value[1]
-            if (man) man.x += man.vx * dt
-            if (rain) rain.x += rain.vx * dt
+
+            // Hot-fix: Inject clouds if they are missing (State Migration)
+            if (objects.value.length < 5 && man) {
+                const cx = man.x
+                const cy = man.y - 100
+                objects.value.push(
+                    { id: 'Cloud1', x: cx - 300, y: cy - 250, vx: props.v2, scale: 0.8, type: 'cloud' },
+                    { id: 'Cloud2', x: cx + 200, y: cy - 280, vx: props.v2, scale: 1.2, type: 'cloud' },
+                    { id: 'Cloud3', x: cx - 100, y: cy - 350, vx: props.v2, scale: 0.6, type: 'cloud' },
+                    { id: 'Cloud4', x: cx + 400, y: cy - 220, vx: props.v2, scale: 0.9, type: 'cloud' },
+                    { id: 'Cloud5', x: cx - 400, y: cy - 300, vx: props.v2, scale: 0.7, type: 'cloud' }
+                )
+            }
+
+            // Boost speed for visibility
+            const timeScale = 5
+
+            if (man) {
+                man.x += man.vx * dt * timeScale
+                // Tighter cyclic wrapping for visual loop
+                const limit = 400
+                if (man.x > limit) man.x = -limit
+                if (man.x < -limit) man.x = limit
+            }
+
+            if (rain) {
+                rain.x += rain.vx * dt * timeScale
+                // Link rain source wrapping to man for consistancy, or let it follow man logic
+                // Rain source typically covers the sky, but here it's a point source. 
+                // Let's just let it move with wind.
+
+                // If Man wraps, we should probably wrap Rain to keep them relatively close?
+                // The parent component handles rain-snap, so we just update position here.
+            }
+
+            // Update Clouds
+            objects.value.forEach(obj => {
+                if (obj.type === 'cloud') {
+                    obj.vx = props.v2 // Update wind speed
+                    obj.x += obj.vx * dt * timeScale * 0.5 // Move slower for parallax
+
+                    // Wrap clouds
+                    if (obj.x > 800) obj.x = -800
+                    else if (obj.x < -800) obj.x = 800
+                }
+            })
         },
         draw: (ctx, canvas, objects, props, utils) => {
             // Draw rainy environment
@@ -197,10 +247,10 @@ export const scenarios = {
             // Puddles with reflections
             ctx.fillStyle = 'rgba(71, 85, 105, 0.5)'
             const puddles = [
-                { x: man.x - 200, w: 150 },
-                { x: man.x + 100, w: 200 },
-                { x: man.x - 450, w: 180 },
-                { x: man.x + 350, w: 160 }
+                { x: -200, w: 150 },
+                { x: 100, w: 200 },
+                { x: -450, w: 180 },
+                { x: 350, w: 160 }
             ]
             puddles.forEach(p => {
                 ctx.beginPath()
@@ -219,14 +269,25 @@ export const scenarios = {
             // Rain particles
             utils.drawRain(ctx, man.x, man.y)
 
-            // Rain source (cloud) and Man
+            // Rain source (cloud) and Man and Background Clouds
             objects.value.forEach(obj => {
                 if (obj.id === 'Rain') {
                     utils.drawRainSource(ctx, obj.x, obj.y, obj.color, obj.label)
+                } else if (obj.type === 'cloud') {
+                    // Draw simple cloud shape
+                    ctx.save()
+                    ctx.translate(obj.x, obj.y)
+                    ctx.scale(obj.scale, obj.scale)
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
+                    ctx.beginPath()
+                    ctx.arc(0, 0, 30, 0, Math.PI * 2)
+                    ctx.arc(40, -10, 35, 0, Math.PI * 2)
+                    ctx.arc(80, 0, 30, 0, Math.PI * 2)
+                    ctx.arc(40, 10, 30, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.restore()
                 } else if (obj.id === 'Man') {
                     utils.drawMan(ctx, obj.x, obj.y)
-                    // Draw Vector Diagram for JEE clarity
-                    utils.drawRainVectorDiagram(ctx, obj.x, obj.y, props.v2, 10, props.v1, 0)
                 }
             })
         },
@@ -244,9 +305,7 @@ export const scenarios = {
             // Angle is relative to vertical (Y axis)
             const umbrellaAngle = Math.atan2(v_rel_x, v_rel_y) * 180 / Math.PI
 
-            return [
-                { label: 'Umbrella Angle', value: umbrellaAngle.toFixed(1) + '°' }
-            ]
+            return []
         }
     },
 

@@ -1,5 +1,5 @@
 <template>
-  <TopicPlaceholder topicTitle="Acceleration & Uniformly Accelerated Motion" />
+  <TopicPlaceholder topicTitle="Acceleration & Motion" />
 </template>
 
 <script setup>

@@ -14,7 +14,11 @@ const props = defineProps({
   showGrid: { type: Boolean, default: true },
   zoom: { type: Number, default: 1 },
   objects: { type: Array, default: () => [] },
-  selectedObjectId: { type: [String, Number, null], default: null }
+  selectedObjectId: { type: [String, Number, null], default: null },
+  // Rain Props
+  rainSpeed: { type: Number, default: 10 }, 
+  manualUmbrella: { type: Boolean, default: false },
+  umbrellaAngle: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['update:zoom', 'update:objects', 'update:selectedObjectId'])
@@ -27,6 +31,13 @@ const isDragging = ref(false)
 const draggedObj = ref(null) // 'obj1', 'obj2', or 'panning'
 const panOffset = ref({ x: 0, y: 0 })
 const lastMousePos = ref({ x: 0, y: 0 })
+
+// Overlay Dragging State
+const overlayPos = ref({ top: 20, right: 20 })
+const isDraggingOverlay = ref(false)
+const vectorPos = ref({ x: 100, y: 150, scale: 1.0 }) // Screen Coords + Scale for Vector Diagram
+const vectorPos2 = ref({ x: 400, y: 150, scale: 1.0 }) // Screen Coords + Scale for Component Diagram
+const dragStartMouse = ref({ x: 0, y: 0 })
 
 // Simulation State
 const objects = computed({
@@ -107,6 +118,46 @@ const handleMouseDown = (e) => {
         }
     }
 
+    if (props.mode === 'rain' && props.showVectors) {
+        // --- Diagram 1 (Originals) ---
+        const v1 = vectorPos.value
+        // Resize Zone (Bottom Right Corner 20x20)
+        const size1 = 150 * v1.scale
+        if (mx >= v1.x + size1 - 20 && mx <= v1.x + size1 + 10 &&
+            my >= v1.y + size1 - 20 && my <= v1.y + size1 + 10) {
+            draggedObj.value = 'vector-resize'
+            isDragging.value = true
+            lastMousePos.value = { x: mx, y: my }
+            return
+        }
+        // Drag Zone
+        if (mx >= v1.x - 20 && mx <= v1.x + size1 &&
+            my >= v1.y - 20 && my <= v1.y + size1) {
+            draggedObj.value = 'vector'
+            isDragging.value = true
+            lastMousePos.value = { x: mx, y: my }
+            return
+        }
+        
+        // --- Diagram 2 (Resultant) ---
+        const v2 = vectorPos2.value
+        const size2 = 150 * v2.scale
+        if (mx >= v2.x + size2 - 20 && mx <= v2.x + size2 + 10 &&
+            my >= v2.y + size2 - 20 && my <= v2.y + size2 + 10) {
+            draggedObj.value = 'vector2-resize'
+            isDragging.value = true
+            lastMousePos.value = { x: mx, y: my }
+            return
+        }
+        if (mx >= v2.x - 20 && mx <= v2.x + size2 &&
+            my >= v2.y - 20 && my <= v2.y + size2) {
+            draggedObj.value = 'vector2'
+            isDragging.value = true
+            lastMousePos.value = { x: mx, y: my }
+            return
+        }
+    }
+
     if (clickedId) {
         draggedObj.value = clickedId
         selectedObjectId.value = clickedId
@@ -115,6 +166,7 @@ const handleMouseDown = (e) => {
         selectedObjectId.value = null
     }
     isDragging.value = true
+    lastMousePos.value = { x: mx, y: my }
 }
 
 const handleMouseMove = (e) => {
@@ -131,6 +183,19 @@ const handleMouseMove = (e) => {
     if (draggedObj.value === 'panning') {
         panOffset.value.x += dx
         panOffset.value.y += dy
+    } else if (draggedObj.value === 'vector') { // Drag Vector Diagram
+        vectorPos.value.x += dx
+        vectorPos.value.y += dy
+    } else if (draggedObj.value === 'vector-resize') { // Resize Vector Diagram
+        // Sensitivity factor
+        const scaleDelta = (dx + dy) * 0.005
+        vectorPos.value.scale = Math.max(0.5, Math.min(3.0, vectorPos.value.scale + scaleDelta))
+    } else if (draggedObj.value === 'vector2') { // Drag Component Diagram
+        vectorPos2.value.x += dx
+        vectorPos2.value.y += dy
+    } else if (draggedObj.value === 'vector2-resize') { // Resize Component Diagram
+        const scaleDelta = (dx + dy) * 0.005
+        vectorPos2.value.scale = Math.max(0.5, Math.min(3.0, vectorPos2.value.scale + scaleDelta))
     } else {
         const simPos = toSimCoords(mx, my)
         const obj = objects.value.find(o => o.id === draggedObj.value)
@@ -144,9 +209,35 @@ const handleMouseMove = (e) => {
     lastMousePos.value = { x: mx, y: my }
 }
 
+
 const handleMouseUp = () => {
     isDragging.value = false
     draggedObj.value = null
+}
+
+// Overlay Dragging Handlers
+const onOverlayDrag = (e) => {
+    if (!isDraggingOverlay.value) return
+    const dx = e.clientX - dragStartMouse.value.x
+    const dy = e.clientY - dragStartMouse.value.y
+    
+    overlayPos.value.right -= dx
+    overlayPos.value.top += dy
+    
+    dragStartMouse.value = { x: e.clientX, y: e.clientY }
+}
+
+const stopOverlayDrag = () => {
+    isDraggingOverlay.value = false
+    window.removeEventListener('mousemove', onOverlayDrag)
+    window.removeEventListener('mouseup', stopOverlayDrag)
+}
+
+const startOverlayDrag = (e) => {
+    isDraggingOverlay.value = true
+    dragStartMouse.value = { x: e.clientX, y: e.clientY }
+    window.addEventListener('mousemove', onOverlayDrag)
+    window.addEventListener('mouseup', stopOverlayDrag)
 }
 
 const addObject = (x = 0, y = 0) => {
@@ -296,6 +387,46 @@ const draw = () => {
   }
 
   ctx.restore()
+  
+  // Draw Screen-Space UI Elements (Vector Diagram)
+  // Draw Screen-Space UI Elements (Vector Diagram)
+  if (props.mode === 'rain' && props.showVectors) {
+      const v1 = vectorPos.value
+      // Draw Diagram 1 (Originals)
+      drawRainVectorDiagram(ctx, v1.x, v1.y, v1.scale)
+      
+      // Border & Resize Handle 1
+      const size1 = 150 * v1.scale
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(v1.x - 10, v1.y - 10, size1 + 20, size1 + 20)
+      
+      // Resize Handle Triangle (Bottom Right)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      ctx.beginPath()
+      ctx.moveTo(v1.x + size1 + 10, v1.y + size1 + 10)
+      ctx.lineTo(v1.x + size1 + 10, v1.y + size1 - 5)
+      ctx.lineTo(v1.x + size1 - 5, v1.y + size1 + 10)
+      ctx.fill()
+      
+      // Draw Diagram 2 (Resultant)
+      const v2 = vectorPos2.value
+      drawRainComponentDiagram(ctx, v2.x, v2.y, v2.scale)
+      
+      // Border & Resize Handle 2
+      const size2 = 150 * v2.scale
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(v2.x - 10, v2.y - 10, size2 + 20, size2 + 20)
+      
+      // Resize Handle Triangle 2
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      ctx.beginPath()
+      ctx.moveTo(v2.x + size2 + 10, v2.y + size2 + 10)
+      ctx.lineTo(v2.x + size2 + 10, v2.y + size2 - 5)
+      ctx.lineTo(v2.x + size2 - 5, v2.y + size2 + 10)
+      ctx.fill()
+  }
   
   update(canvas)
   animationId = requestAnimationFrame(draw)
@@ -686,19 +817,47 @@ const drawMan = (ctx, x, y) => {
     // Physics calculations for umbrella
     // Rain falls vertically relative to air mass. V_rain_horizontal = Air Speed (v2).
     const v_rain_x = props.v2 
-    const v_rain_y = 10     // Constant falling speed
-    
-    // Umbrella blocks rain from relative direction: V_rel = V_man - V_rain
-    // Angle = atan2(V_man - V_rain_x, V_rain_y)
-    const umbrellaAngle = Math.atan2(props.v1 - v_rain_x, v_rain_y)
+    const v_rain_y = props.rainSpeed     // User controlled vertical falling speed
     
     // Animation parameters
     // Stop animation completely when speed is zero
     const t = props.v1 === 0 ? 0 : time.value * (5 + Math.abs(props.v1) * 0.8)
     const facing = Math.sign(props.v1) || 1
+
+    // Umbrella blocks rain from relative direction: V_rel = V_man - V_rain
+    // Angle = atan2(V_man - V_rain_x, V_rain_y)
+    // If Manual Mode, use props.umbrellaAngle (converted to radians)
+    // CORRECTION: Because we ctx.scale(facing, 1), the X-axis is flipped when facing Left.
+    // A calculated angle 'theta' needs to be flipped (multiplied by facing) so that 
+    // "Forward" tilt remains Forward in the flipped context.
+    
+    let umbrellaAngle
+    
+    // Calculate Optimal logic first for both usage
+    const v_rel_x = props.v1 - v_rain_x
+    const optimalAngleRad = Math.atan2(v_rel_x, v_rain_y)
+    
+    if (props.manualUmbrella) {
+        umbrellaAngle = (props.umbrellaAngle * Math.PI / 180) * facing
+    } else {
+        umbrellaAngle = optimalAngleRad * facing
+    }
+    
+    const optimalAngleDeg = optimalAngleRad * 180 / Math.PI
+    
+    let protectionDiff = 0
+    if (props.manualUmbrella) {
+        let a1 = props.umbrellaAngle
+        let a2 = optimalAngleDeg
+        protectionDiff = Math.abs(a1 - a2)
+    }
+
+    const isProtective = !props.manualUmbrella || protectionDiff < 15
+    const isDancing = props.manualUmbrella && isProtective
     
     // Body bobbing (hips move up/down twice per cycle)
-    const bob = Math.abs(Math.cos(t)) * 2
+    // If Dancing: Fast bob
+    const bob = isDancing ? Math.abs(Math.sin(time.value * 15)) * 5 : Math.abs(Math.cos(t)) * 2
     
     // Joint calculations (Local coordinates, relative to x,y)
     const hipX = 0
@@ -723,8 +882,12 @@ const drawMan = (ctx, x, y) => {
     const legR_KneeAngle = (Math.cos(t + Math.PI) > 0) ? -Math.cos(t + Math.PI) * 1.2 : 0
     
     // Arm Kinematics (Contra-lateral: Right Arm swings with Left Leg)
-    const armR_ShoulderAngle = Math.sin(t) * 0.5
-    const armR_ElbowAngle = 0.3 // Slight constant bend
+    // If Dancing: Wave arm wildly
+    const armR_ShoulderAngle = isDancing 
+        ? Math.sin(time.value * 15) * 2.5  // WILD WAVE
+        : Math.sin(t) * 0.5
+    
+    const armR_ElbowAngle = isDancing ? 1.0 : 0.3 // Slight constant bend
     
     // Umbrella Arm (Left) - Holding position
     // Adjusted to hold umbrella IN FRONT (Forward-Down shoulder, Forward-Up forearm)
@@ -793,11 +956,33 @@ const drawMan = (ctx, x, y) => {
     ctx.beginPath()
     ctx.arc(headX, headY - 1, 7.2, Math.PI, 0)
     ctx.fill()
+    ctx.fill()
     // Face (Eye) - Direction aware
     ctx.fillStyle = '#111'
     ctx.beginPath()
     ctx.arc(headX + 3, headY - 1, 1.2, 0, Math.PI * 2)
     ctx.fill()
+    
+    // Mouth (Smile or Frown)
+    ctx.strokeStyle = '#111'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    if (isProtective) {
+        // Smile
+        ctx.arc(headX + 3, headY + 2, 2.5, 0, Math.PI, false)
+    } else {
+        // Frown
+        ctx.arc(headX + 3, headY + 4, 2.5, Math.PI, 0, false)
+        
+        // Tears (Blue drops)
+        if (Math.random() > 0.8) {
+             ctx.fillStyle = '#0ea5e9'
+             ctx.beginPath()
+             ctx.arc(headX + 4, headY + 2, 1, 0, Math.PI*2)
+             ctx.fill()
+        }
+    }
+    ctx.stroke()
     
     // 6. Near Leg (Left)
     const kneeL = drawLimb(hipX, hipY, legL_ThighAngle, 15, 5, '#1e40af')
@@ -875,17 +1060,69 @@ const drawMan = (ctx, x, y) => {
     ctx.arc(0, topY, 2.5, 0, Math.PI * 2)
     ctx.fill()
     
+    ctx.fill()
+    
     ctx.restore()
+    // Draw Thought Bubble (Imagination)
+    if (props.manualUmbrella) {
+        const bubbleX = x + (60 * facing)
+        const bubbleY = y - 100
+        
+        ctx.save()
+        // Determine Bubble Style
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+        ctx.shadowBlur = 10
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)'
+        
+        // Draw trailing dots
+        for(let i=1; i<=3; i++) {
+            ctx.beginPath()
+            ctx.arc(x + (15*i*facing), y - 70 - (i*5), 3 + i, 0, Math.PI*2)
+            ctx.fill()
+        }
+        
+        // Main Bubble
+        ctx.beginPath()
+        ctx.ellipse(bubbleX, bubbleY, 35, 25, 0, 0, Math.PI*2)
+        ctx.fill()
+        
+        // Content
+        ctx.save() // Inner save for clipping
+        ctx.beginPath()
+        ctx.ellipse(bubbleX, bubbleY, 35, 25, 0, 0, Math.PI*2)
+        ctx.clip() // Clip to bubble
+        
+        if (isProtective) {
+            // Happy Thoughts: Dancing / Music
+            ctx.font = '30px Arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText('🕺', bubbleX, bubbleY)
+        } else {
+            // Sad Thoughts: Rain Cloud / Wet
+            ctx.font = '30px Arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText('😭', bubbleX - 10, bubbleY)
+            ctx.fillText('🌧️', bubbleX + 10, bubbleY + 5)
+        }
+        ctx.restore() // Undo Clip
+        
+        ctx.restore()
+    }
 }
+
 
 const drawRain = (ctx, x, y) => {
     // Rain angle
-    // Vertical is constant 10. Horizontal is relative to the observer frame!
-    // JEE Context: V_rain_ground = (v2, 10). V_man_ground = (v1, 0).
-    // If observer is Man, V_rain_rel = (v2 - v1, 10).
+    // Vertical is variable (props.rainSpeed). Horizontal is relative to the observer frame!
+    // JEE Context: V_rain_ground = (v2, v_rain_y). V_man_ground = (v1, 0).
+    const v_rain_y = props.rainSpeed
     const vx = (props.observerFrame === 'obj1' || props.observerFrame === 'Man') ? (props.v2 - props.v1) : props.v2
-    const vy = 10
-    const angle = Math.atan2(vy, vx) 
+    const vy = v_rain_y
+    
+    // Correct rotation to align drop with vector(vx, vy)
+    const dropAngle = -Math.atan2(vx, vy)
 
     
     // Draw drops
@@ -897,9 +1134,7 @@ const drawRain = (ctx, x, y) => {
     
     // Total speed for scaling tail length
     const totalSpeed = Math.hypot(vx, vy)
-    
-    // Relative horizontal velocity for drift
-    const deltaVx = props.v2 - props.v1
+    const speedScale = 40 
 
     for (let i = 0; i < numDrops; i++) {
         // Deterministic randomness based on index
@@ -908,12 +1143,12 @@ const drawRain = (ctx, x, y) => {
         const r3 = ((i * 73.5) % 1000) / 1000
         
         // Move drops relative to ground, then relate to man's moving frame
-        // Horizontal: initial pos + wind_drift - man_drift
+        // Horizontal: initial pos + vx * time
         const initialX = (r1 * w) - w/2
-        const dx = ((initialX + time.value * deltaVx * 10) % w + w) % w - w/2
+        const dx = ((initialX + time.value * vx * speedScale) % w + w) % w - w/2
         
-        // Continuous y falling - Faster for better effect
-        const dy = ((r2 * h + time.value * vy * 30 + i * 10) % h) - h/3
+        // Continuous y falling
+        const dy = ((r2 * h + time.value * vy * speedScale) % h) - h/3
         
         // Layering
         let size, alpha, color
@@ -938,9 +1173,6 @@ const drawRain = (ctx, x, y) => {
         ctx.save()
         ctx.translate(dropX, dropY)
         // Rotate to match velocity vector
-        // When vx=0, vy=10: rain falls straight down (no rotation)
-        // When vx!=0: rain slants based on wind
-        const dropAngle = vx === 0 ? 0 : -Math.atan2(vx, vy)
         ctx.rotate(dropAngle)
         
         // Draw Teardrop Shape pointing DOWN
@@ -994,49 +1226,186 @@ const drawRainSource = (ctx, x, y, color, label) => {
     ctx.fillText(label, 0, 35)
     
     ctx.restore()
+    ctx.restore()
 }
 
-const drawRainVectorDiagram = (ctx, x, y, vrx, vry, vmx, vmy) => {
+const drawRainVectorDiagram = (ctx, x, y, userScale = 1.0) => {
     ctx.save()
-    ctx.translate(x + 200, y - 50) 
+    // Position diagram at x, y (Screen Coordinates)
+    ctx.translate(x, y)
     
-    // Scale for visualization
-    const scale = 5
+    // Scale the entire diagram
+    ctx.scale(userScale, userScale)
     
-    // Draw v_R (Rain velocity)
-    drawVector(ctx, 0, 0, vrx, vry, '#60a5fa', 'v_r')
+    const scale = 8 // pixel per unit base scale
     
-    // Draw -v_M (Negative of Man velocity) starting from v_R tip
-    // Note: drawVector takes magnitude and angle, but our internal drawVector 
-    // actually takes mag and angleDeg. Let's use a simpler vector draw for this diagram.
+    // Velocities
+    const v_man_x = props.v1
+    const v_man_y = 0
+    const v_rain_x = props.v2 // Air Speed
+    const v_rain_y = props.rainSpeed
     
-    const rx = vrx * scale
-    const ry = vry * scale
-    const mx = -vmx * scale
-    const my = -vmy * scale
+    // 1. Draw Man Velocity (Red) - Side A
+    drawVector(ctx, 0, 0, v_man_x, 0, '#f87171', '')
     
-    // -v_m
+    // Calculate Man Tip
+    const mx = v_man_x * 10 // drawVector uses * 10 internal scaling. 
+    // Wait, drawVector logic: len = mag * 10. angle = -angleDeg.
+    // If I pass raw components, drawVector expects polar.
+    // I should create a helper for cartesian or just render manually.
+    // Using manual rendering for precise triangle control.
+    
+    const s = 10 // Visual scale factor matching drawVector's internal *10? 
+    // Actually drawVector takes Mag and AngleDeg.
+    // Let's just draw lines manually to be safe and exact.
+    
+    const O = {x: 0, y: 0}
+    const M = {x: v_man_x * s, y: 0}       // Man Vector (Horizontal)
+    const R = {x: v_rain_x * s, y: v_rain_y * s} // Rain Vector (Vertical/Slanted)
+    
+    // Draw V_Man (Origin -> M)
     ctx.beginPath()
-    ctx.moveTo(rx, ry)
-    ctx.lineTo(rx + mx, ry + my)
-    ctx.strokeStyle = '#f87171'
-    ctx.lineWidth = 2
+    ctx.moveTo(O.x, O.y)
+    ctx.lineTo(M.x, M.y)
+    ctx.strokeStyle = '#f87171' // Red
+    ctx.lineWidth = 3
     ctx.stroke()
-    ctx.fillStyle = '#f87171'
-    ctx.fillText('-v_m', rx + mx/2, ry + my - 10)
+    
+    // Draw V_Rain (Origin -> R) - Ground Frame
+    ctx.beginPath()
+    ctx.moveTo(O.x, O.y)
+    ctx.lineTo(R.x, R.y)
+    ctx.strokeStyle = '#60a5fa' // Blue
+    ctx.lineWidth = 3
+    ctx.stroke()
+    
+    // Arrow Heads
+    const drawArrow = (from, to, color) => {
+        const angle = Math.atan2(to.y - from.y, to.x - from.x)
+        const head = 10
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(to.x, to.y)
+        ctx.lineTo(to.x - head * Math.cos(angle - Math.PI/6), to.y - head * Math.sin(angle - Math.PI/6))
+        ctx.lineTo(to.x - head * Math.cos(angle + Math.PI/6), to.y - head * Math.sin(angle + Math.PI/6))
+        ctx.closePath()
+        ctx.fill()
+    }
+    
+    drawArrow(O, M, '#f87171')
+    drawArrow(O, R, '#60a5fa')
 
-    // v_rm (Resultant)
+    // Labels
+    ctx.fillStyle = '#f87171'
+    ctx.font = 'bold 12px Inter'
+    ctx.fillText('v_M', M.x/2, M.y - 10)
+    
+    ctx.fillStyle = '#60a5fa'
+    ctx.fillText('v_R', R.x/2 - 20, R.y/2)
+    
+    // Label for the Diagram
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '10px Inter'
+    ctx.textAlign = 'left'
+    ctx.fillText('Ground Frame (Originals)', -50, -20)
+    
+    ctx.restore()
+}
+
+
+const drawRainComponentDiagram = (ctx, x, y, userScale = 1.0) => {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.scale(userScale, userScale)
+    
+    const s = 8 // Scale factor
+    
+    // Velocities
+    const v_man_x = props.v1
+    const v_rain_y = props.rainSpeed
+    const v_rain_x = props.v2 // Wind/Air horizontal component
+    
+    // Component vectors
+    const manVec = { x: v_man_x * s, y: 0 }
+    const rainVec = { x: v_rain_x * s, y: v_rain_y * s }
+    
+    // Draw axes
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
+    ctx.lineWidth = 1
     ctx.setLineDash([3, 3])
+    // Crosshair axes
+    ctx.beginPath(); ctx.moveTo(-50, 0); ctx.lineTo(150, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(0, 150); ctx.stroke();
+    ctx.setLineDash([])
+    
+    // Diagram Label
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '10px Inter'
+    ctx.textAlign = 'left'
+    ctx.fillText('Relative Frame (Resultant)', -50, -20)
+    
+    // Draw V_Rain (Background/Original)
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)' // Faint Blue
+    ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(0, 0)
-    ctx.lineTo(rx + mx, ry + my)
-    ctx.strokeStyle = '#fbbf24'
+    ctx.lineTo(rainVec.x, rainVec.y)
+    ctx.stroke()
+    
+    // Draw -V_Man (Reversed Man Vector) added to V_Rain
+    // Start at V_Rain tip, go backwards by V_Man
+    // -V_Man = {x: -manVec.x, y: 0}
+    const endPoint = { x: rainVec.x - manVec.x, y: rainVec.y }
+    
+    ctx.strokeStyle = '#ef4444' // Red (Negative)
     ctx.lineWidth = 2
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.moveTo(rainVec.x, rainVec.y)
+    ctx.lineTo(endPoint.x, endPoint.y)
     ctx.stroke()
     ctx.setLineDash([])
-    ctx.fillStyle = '#fbbf24'
-    ctx.fillText('v_rm', (rx+mx)/2 - 30, (ry+my)/2)
-
+    
+    // Draw Resultant V_RM (Origin to EndPoint)
+    // V_RM = V_R - V_M
+    ctx.strokeStyle = '#fcd34d' // Yellow
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(endPoint.x, endPoint.y)
+    ctx.stroke()
+    
+    // Arrow Helper
+    const drawComponentArrow = (to, color, from = {x:0, y:0}) => {
+        const angle = Math.atan2(to.y - from.y, to.x - from.x)
+        const head = 8
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(to.x, to.y)
+        ctx.lineTo(to.x - head * Math.cos(angle - Math.PI/6), to.y - head * Math.sin(angle - Math.PI/6))
+        ctx.lineTo(to.x - head * Math.cos(angle + Math.PI/6), to.y - head * Math.sin(angle + Math.PI/6))
+        ctx.closePath()
+        ctx.fill()
+    }
+    
+    drawComponentArrow(rainVec, '#60a5fa')
+    drawComponentArrow(endPoint, '#ef4444', rainVec) // -V_M arrow
+    drawComponentArrow(endPoint, '#fcd34d') // Resultant Arrow
+    
+    // Labels
+    ctx.font = 'bold 11px Inter'
+    ctx.textAlign = 'center'
+    
+    ctx.fillStyle = '#60a5fa'
+    ctx.fillText('v_R', rainVec.x/2 + 20, rainVec.y/2)
+    
+    ctx.fillStyle = '#ef4444'
+    ctx.fillText('-v_M', (rainVec.x + endPoint.x)/2, endPoint.y - 10)
+    
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#fcd34d'
+    ctx.fillText('v_RM', endPoint.x/2 - 30, endPoint.y/2 + 20)
+    
     ctx.restore()
 }
 
@@ -1244,27 +1613,64 @@ defineExpose({ reset: initSimulation, addObject, objects, selectedObjectId })
     </div>
     
     <!-- Physics Logic Overlay for Rain Scenario -->
-    <div class="physics-overlay glass-panel" v-if="mode === 'rain'" style="position: absolute; top: 20px; right: 20px; text-align: right; pointer-events: none; padding: 15px;">
-        <div class="formula-block" style="display: flex; flex-direction: column; gap: 8px;">
-            <div class="formula-row" style="color: #60a5fa; font-weight: bold;">
-                <span>v⃗<sub>R,G</sub></span> = (<span class="val">{{ props.v2.toFixed(1) }}</span>, <span class="val">10.0</span>)
+    <div 
+        class="physics-overlay glass-panel" 
+        v-if="mode === 'rain'" 
+        :style="{ 
+            position: 'absolute', 
+            top: overlayPos.top + 'px', 
+            right: overlayPos.right + 'px', 
+            textAlign: 'right', 
+            cursor: isDraggingOverlay ? 'grabbing' : 'grab',
+            padding: '15px',
+            userSelect: 'none'
+        }"
+        @mousedown.stop="startOverlayDrag"
+    >
+        <div class="formula-block" style="display: flex; flex-direction: column; gap: 12px; font-family: 'Cambria Math', 'Times New Roman', serif;">
+            <!-- Vr,g -->
+            <div class="formula-row" style="color: #60a5fa; font-weight: bold; font-size: 1.1em; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                <span style="font-size: 0.8em; opacity: 0.9; margin-right: 4px;">Rain:</span>
+                <span style="position: relative; display: inline-block; margin-right: 2px;">
+                    v
+                    <span style="position: absolute; top: -0.5em; left: 0; right: 0; text-align: center; font-size: 0.8em;">→</span>
+                </span>
+                <sub>R</sub> = (<span class="val">{{ props.v2.toFixed(1) }}</span>, <span class="val">{{ props.rainSpeed.toFixed(1) }}</span>)
             </div>
-            <div class="formula-row" style="color: #f87171; font-weight: bold;">
-                <span>v⃗<sub>M,G</sub></span> = (<span class="val">{{ props.v1.toFixed(1) }}</span>, <span class="val">0.0</span>)
+            
+            <!-- Vm,g -->
+            <div class="formula-row" style="color: #f87171; font-weight: bold; font-size: 1.1em; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                <span style="font-size: 0.8em; opacity: 0.9; margin-right: 4px;">Man:</span>
+                <span style="position: relative; display: inline-block; margin-right: 2px;">
+                    v
+                    <span style="position: absolute; top: -0.5em; left: 0; right: 0; text-align: center; font-size: 0.8em;">→</span>
+                </span>
+                <sub>M</sub> = (<span class="val">{{ props.v1.toFixed(1) }}</span>, <span class="val">0.0</span>)
             </div>
-            <div class="formula-row" style="color: #fcd34d; font-weight: bold; font-size: 1.1em; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                <span>v⃗<sub>R,M</sub></span> = (<span class="val">{{ (props.v2 - props.v1).toFixed(1) }}</span>, <span class="val">10.0</span>)
+            
+            <!-- Vr,m -->
+            <div class="formula-row" style="color: #fcd34d; font-weight: bold; font-size: 1.25em; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                <span style="font-size: 0.7em; opacity: 0.9; margin-right: 4px;">Relative:</span>
+                <span style="position: relative; display: inline-block; margin-right: 2px;">
+                    v
+                    <span style="position: absolute; top: -0.5em; left: 0; right: 0; text-align: center; font-size: 0.8em;">→</span>
+                </span>
+                <sub>RM</sub> = (<span class="val">{{ (props.v2 - props.v1).toFixed(1) }}</span>, <span class="val">{{ props.rainSpeed.toFixed(1) }}</span>)
             </div>
+            
             <div class="formula-divider" style="height: 1px; background: rgba(255,255,255,0.2); margin: 4px 0;"></div>
-            <div class="formula-row highlight" style="font-size: 1.25em; color: #fbbf24; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+            
+            <!-- Angle Calculation -->
+            <div class="formula-row highlight" style="font-size: 1.3em; color: #fbbf24; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
                 <span>tan(θ) = </span>
-                <div style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.8em;">
-                    <span style="border-bottom: 1px solid #fff; padding: 0 5px;">|v<sub>R,x</sub> - v<sub>M,x</sub>|</span>
-                    <span>v<sub>R,y</sub></span>
+                <div style="display: inline-flex; flex-direction: column; align-items: center; font-size: 0.9em; vertical-align: middle;">
+                    <span style="border-bottom: 2px solid #fff; padding: 0 5px; display: block; line-height: 1.2;">| v<sub>R,x</sub> - v<sub>M,x</sub> |</span>
+                    <span style="display: block; line-height: 1.2;">v<sub>R,y</sub></span>
                 </div>
-                <span> = {{ Math.abs((props.v2 - props.v1) / 10).toFixed(2) }}</span>
+                <span> = {{ Math.abs((props.v2 - props.v1) / props.rainSpeed).toFixed(2) }}</span>
             </div>
-            <div style="font-size: 0.8rem; color: #94a3b8; font-style: italic;">
+            
+            <div style="font-size: 0.9rem; color: #94a3b8; font-style: italic; margin-top: 5px;">
                 (θ is the angle with the vertical)
             </div>
         </div>
