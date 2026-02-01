@@ -15,6 +15,17 @@ import Capacitors from '../views/unit/electrostatics/Capacitors.vue'
 import FreeLabIndex from '../views/experimentalskill/freelab/FreeLabIndex.vue'
 import PrivacyPolicy from '../views/pages/PrivacyPolicy.vue'
 import DrawingView from '../views/drawingTools/DrawingView.vue'
+
+// Kinematics Module
+import KinematicsIndex from '../views/unit/kinematics/Index.vue'
+import FrameOfReference from '../views/unit/kinematics/FrameOfReference.vue'
+import StraightLineMotion from '../views/unit/kinematics/StraightLineMotion.vue'
+import Acceleration from '../views/unit/kinematics/Acceleration.vue'
+import KinematicGraphs from '../views/unit/kinematics/Graphs.vue'
+import RelativeVelocity from '../views/unit/kinematics/RelativeVelocity.vue'
+import ProjectileMotion from '../views/unit/kinematics/ProjectileMotion.vue'
+import CircularMotion from '../views/unit/kinematics/CircularMotion.vue'
+
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
@@ -63,6 +74,19 @@ const router = createRouter({
                 { path: 'gausslaw', name: 'gausslaw', component: GaussLaw, meta: { hideNav: true } },
                 { path: 'potential', name: 'potential', component: Potential, meta: { hideNav: true } },
                 { path: 'capacitors', name: 'capacitors', component: Capacitors, meta: { hideNav: true } }
+            ]
+        },
+        {
+            path: '/kinematics',
+            children: [
+                { path: '', name: 'kinematics-index', component: KinematicsIndex },
+                { path: 'frame-of-reference', name: 'frame-of-reference', component: FrameOfReference, meta: { hideNav: true } },
+                { path: 'straight-line', name: 'straight-line', component: StraightLineMotion, meta: { hideNav: true } },
+                { path: 'acceleration', name: 'acceleration', component: Acceleration, meta: { hideNav: true } },
+                { path: 'graphs', name: 'kinematic-graphs', component: KinematicGraphs, meta: { hideNav: true } },
+                { path: 'relative-velocity', name: 'relative-velocity', component: RelativeVelocity, meta: { hideNav: true } },
+                { path: 'projectile', name: 'projectile', component: ProjectileMotion, meta: { hideNav: true } },
+                { path: 'circular', name: 'circular', component: CircularMotion, meta: { hideNav: true } }
             ]
         },
         {

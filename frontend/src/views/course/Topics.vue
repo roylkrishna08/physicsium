@@ -45,7 +45,7 @@ const handleTopicClick = (topic) => {
     if (title.includes('experimental')) {
         router.push('/experiments')
     } else if (title.includes('kinematics')) {
-        router.push('/lab/projectile')
+        router.push('/kinematics')
     } else if (title.includes('electrostatics')) {
         router.push('/electrostatics')
     } else if (title.includes('gravitation')) {

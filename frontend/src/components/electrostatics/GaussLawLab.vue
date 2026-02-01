@@ -46,16 +46,22 @@ const handleClearDrawing = () => {
 }
 
 const topics = [
-    { id: 'flux', label: "Electric Flux" },
+    { id: 'area_vector', label: "Area Vector" },
     { id: 'solid_angle', label: "Solid Angle" },
+    { id: 'flux', label: "Electric Flux" },
     { id: 'wire', label: "Infinite Wire" },
     { id: 'sheet', label: "Infinite Plane Sheet" },
-    { id: 'shell', label: "Thin Spherical Shell" }
+    { id: 'shell', label: "Thin Spherical Shell" },
+    { id: 'solid_sphere', label: "Solid Charged Sphere" }
 ]
-const activeTopic = ref('flux')
+const activeTopic = ref('area_vector')
 
 const handleTopicSelect = (topicId) => {
     activeTopic.value = topicId
+    if (topicId === 'flux') {
+        chargePos.value = { x: -400, y: 0, z: 0 }
+        clearFlux() // Start clean as requested
+    }
 }
 
 const viewportStyle = computed(() => ({
@@ -74,8 +80,33 @@ const surfaceLength = ref(200) // Wire length or Sheet size
 const shellRadius = ref(80)
 const showFormulas = ref(true)
 
-// Charge Position (for Flux topic)
-const chargePos = ref({ x: 0, y: 0, z: 0 })
+// Area Vector State
+const areaVectorShape = ref('plane')
+const dASize = ref(10) // Initial size for dA and thick arrow
+
+// Flux Source State
+const fluxSourceType = ref('point') // point, plane, wire
+
+// Flux 3D Experiment State
+const chargePos = ref({ x: -400, y: 0, z: 0 })
+const planePos = ref({ x: 0, y: 0, z: 0 })
+const planeRotation = ref({ x: 0, y: 0, z: 0 })
+const showSource = ref(true)
+const showSurface = ref(true)
+const showShadow = ref(true)
+const showAreaVector = ref(true)
+const calculatedFlux = ref(0)
+const thetaAngle = ref(0)
+
+const clearFlux = () => {
+    showSource.value = false
+    showSurface.value = false
+    showShadow.value = false
+    showAreaVector.value = false
+    calculatedFlux.value = 0
+    thetaAngle.value = 0
+    // Also reset positions/rotations if needed? Or just hide them is "clear".
+}
 
 // Solid Angle Extra state
 const solidAngleDirection = ref({ phi: 0, theta: 0 })
@@ -99,9 +130,7 @@ onUnmounted(() => {
 })
 
 // Visibility Toggles
-const showSurface = ref(true)
 const showLines = ref(true)
-const showSource = ref(true)
 
 const zoomIn = () => {
     zoom.value = Math.min(2.0, zoom.value + 0.1)
@@ -119,15 +148,20 @@ const isInside = computed(() => {
     if (activeTopic.value !== 'flux') return true
     
     const { x, y, z } = chargePos.value
-    const distSq = x*x + y*y + z*z
     const R = surfaceRadius.value
+    const L = surfaceLength.value / 2
     
-    if (surfaceType.value === 'spherical') {
-        return Math.sqrt(distSq) <= R
+    if (surfaceType.value === 'spherical' || activeTopic.value === 'solid_sphere') {
+        return (x*x + y*y + z*z) <= R*R
     } else if (surfaceType.value === 'cylindrical') {
-        const rho = Math.sqrt(x*x + z*z)
-        return rho <= R && Math.abs(y) <= 175 // 350/2 is hardcoded height in simulation
-    } else {
+        const rhoSq = x*x + z*z
+        return rhoSq <= R*R && Math.abs(y) <= L
+    } else { // box (cube geometry, but controls say 'Box')
+        // BoxGeometry created with size = radius * 2. So half-width is radius.
+        // But controls have 'Length' slider? No, Box uses radius for size in setupSurfaceMesh ('const s = props.surfaceRadius * 2')
+        // Wait, setupSurfaceMesh uses BoxGeometry(s, s, s) -> Cube.
+        // If we want a non-cube box, we'd need length.
+        // Let's assume Cube based on setupSurfaceMesh.
         return Math.abs(x) <= R && Math.abs(y) <= R && Math.abs(z) <= R
     }
 })
@@ -136,6 +170,11 @@ const EPSILON_0 = 8.854e-12
 const fluxValue = computed(() => {
     if (activeTopic.value === 'shell') {
         return surfaceRadius.value >= shellRadius.value ? chargeValue.value : 0
+    }
+    if (activeTopic.value === 'solid_sphere') {
+        // q_enclosed = Q * (r/R)^3 if r < R, else Q
+        const ratio = Math.min(1, surfaceRadius.value / shellRadius.value)
+        return chargeValue.value * Math.pow(ratio, 3)
     }
     if (activeTopic.value === 'flux') {
         return isInside.value ? chargeValue.value : 0
@@ -171,129 +210,114 @@ const fluxValue = computed(() => {
             @update:isOpen="controlsOpen = $event"
         >
             <div class="sidebar-controls">
-                <div class="control-group">
-                    <h3 style="margin-top: 0">Visibility</h3>
-                    <label class="toggle-label">
-                        <input type="checkbox" v-model="showSource">
-                        Show Source (Charge/Wire)
-                    </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" v-model="showSurface">
-                        Show Gaussian Surface
-                    </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" v-model="showLines">
-                        Show Field Lines
-                    </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" v-model="showFormulas">
-                        Show Theory & Data
-                    </label>
-                </div>
+                <!-- Visibility controls removed as per request; simulation defaults to showing lines -->
+                
                 <div v-if="activeTopic === 'flux'" class="topic-controls">
-                    <h3>Electric Flux</h3>
+                    <h3>Electric Field Source</h3>
                     <div class="control-group">
-                        <label class="slider-label">Charge Enclosed (q): {{chargeValue}} nC</label>
-                        <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Surface Type</label>
-                        <select v-model="surfaceType" class="shape-dropdown">
-                            <option value="spherical">Spherical</option>
-                            <option value="cylindrical">Cylindrical</option>
-                            <option value="box">Cube/Box</option>
+                        <label class="slider-label">Source Type</label>
+                        <select v-model="fluxSourceType" class="shape-dropdown">
+                            <option value="point">Point Charge</option>
+                            <option value="wire">Infinite Wire</option>
+                            <option value="plane">Infinite Plane Sheet</option>
                         </select>
                     </div>
+
                     <div class="control-group">
-                        <label class="slider-label">Surface Radius: {{surfaceRadius}} px</label>
-                        <input type="range" v-model.number="surfaceRadius" min="50" max="250" step="10" class="range-slider">
+                        <label class="slider-label">Charge (q): {{chargeValue}} μC</label>
+                        <input type="range" v-model.number="chargeValue" min="-20" max="20" step="1" class="range-slider">
                     </div>
+
                     <div class="control-group">
-                        <h4 style="margin: 0.5rem 0 0.2rem; font-size: 0.8rem; color: #94a3b8;">Charge Position</h4>
-                        <label class="slider-label">X: {{chargePos.x}}</label>
-                        <input type="range" v-model.number="chargePos.x" min="-250" max="250" step="5" class="range-slider">
-                        <label class="slider-label">Y: {{chargePos.y}}</label>
-                        <input type="range" v-model.number="chargePos.y" min="-250" max="250" step="5" class="range-slider">
-                        <label class="slider-label">Z: {{chargePos.z}}</label>
-                        <input type="range" v-model.number="chargePos.z" min="-250" max="250" step="5" class="range-slider">
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showLines">
+                            Show Field Lines (Rays)
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showSource">
+                            Show Field Source
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showSurface">
+                            Show Interaction Plane
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showShadow">
+                            Show Shadow Projection
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showAreaVector">
+                            Show Area Vector (A)
+                        </label>
+                    </div>
+
+                    <div v-if="showSurface" class="control-group active-data">
+                        <label class="slider-label">Physical Quantities</label>
+                        <div class="readout-item">
+                            <span class="label">Total Flux (Φ)</span>
+                            <span class="value">{{ calculatedFlux.toFixed(2) }}</span>
+                        </div>
+                        <div class="readout-item">
+                            <span class="label">Angle (θ)</span>
+                            <span class="value">{{ thetaAngle.toFixed(1) }}°</span>
+                        </div>
+                    </div>
+
+                    <div v-if="showSurface" class="control-group">
+                        <label class="slider-label">Experiment Controls</label>
+                        <button @click="planeRotation = { x: 0, y: 0, z: 0 }" class="action-btn">Reset Orientation</button>
+                        <p class="hint-text">Drag edges of plane to rotate</p>
+                    </div>
+
+                    <div class="control-group">
+                        <button @click="clearFlux" class="action-btn danger">Clear Simulation</button>
                     </div>
                 </div>
-                
+
+                <div v-if="activeTopic === 'area_vector'" class="topic-controls">
+                    <h3>Area Vector</h3>
+                    
+                    <div class="control-group">
+                        <label class="slider-label">Shape</label>
+                        <select v-model="areaVectorShape" class="shape-dropdown">
+                            <option value="plane">Plane</option>
+                            <option value="sphere">Sphere</option>
+                            <option value="cylinder">Cylinder</option>
+                            <option value="cube">Cube</option>
+                            <option value="potato">Random Shape</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="slider-label">Size</label>
+                        <input type="range" v-model.number="surfaceRadius" min="50" max="250" step="10" class="range-slider">
+                    </div>
+
+                    <div class="control-group">
+                        <label class="slider-label">dA Element Size</label>
+                        <input type="range" v-model.number="dASize" min="1" max="20" step="1" class="range-slider">
+                    </div>
+                     <!-- Description text removed as per request -->
+                </div>
+
                 <div v-if="activeTopic === 'solid_angle'" class="topic-controls">
                     <h3>Solid Angle (Ω)</h3>
                     <div class="control-group">
-                        <label class="slider-label">Aperture Angle (θ/2): {{chargeValue}}°</label>
-                        <input type="range" v-model.number="chargeValue" min="5" max="175" step="1" class="range-slider">
+                        <label class="slider-label">Aperture Size: {{chargeValue}}°</label>
+                        <input type="range" v-model.number="chargeValue" min="2" max="179" step="1" class="range-slider">
                     </div>
                     <div class="control-group">
-                        <label class="slider-label">Radius (r): {{surfaceRadius}} px</label>
+                        <label class="slider-label">Projection Radius: {{surfaceRadius}} px</label>
                         <input type="range" v-model.number="surfaceRadius" min="50" max="350" step="10" class="range-slider">
                     </div>
                     <div class="control-group">
-                        <h4 style="margin: 0.5rem 0 0.2rem; font-size: 0.8rem; color: #94a3b8;">Direction</h4>
-                        <label class="slider-label">Azimuth: {{solidAngleDirection.phi}}°</label>
-                        <input type="range" v-model.number="solidAngleDirection.phi" min="0" max="360" step="1" class="range-slider">
-                        <label class="slider-label">Elevation: {{solidAngleDirection.theta}}°</label>
-                        <input type="range" v-model.number="solidAngleDirection.theta" min="-90" max="90" step="1" class="range-slider">
-                    </div>
-                    <label class="toggle-label">
-                        <input type="checkbox" v-model="showSecondary">
-                        Show Concentric Layers
-                    </label>
-                    <label class="toggle-label" style="margin-top: 5px; color: #00ff9d;">
-                        <input type="checkbox" v-model="autoScan">
-                        Auto-Scan Mode (Demo)
-                    </label>
-                </div>
-
-                <div v-if="activeTopic === 'wire'" class="topic-controls">
-                    <h3>Infinite Wire</h3>
-                    <div class="control-group">
-                        <label class="slider-label">Linear Charge Density (λ): {{chargeValue}} nC/m</label>
-                        <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Gaussian Radius (r): {{surfaceRadius}} px</label>
-                        <input type="range" v-model.number="surfaceRadius" min="30" max="150" step="5" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Wire Length: {{surfaceLength}} px</label>
-                        <input type="range" v-model.number="surfaceLength" min="200" max="800" step="50" class="range-slider">
+                        <label class="toggle-label">
+                            <input type="checkbox" v-model="showSecondary">
+                            Show Solid Angle Indicator (Ω)
+                        </label>
                     </div>
                 </div>
 
-                <div v-if="activeTopic === 'sheet'" class="topic-controls">
-                    <h3>Infinite Plane Sheet</h3>
-                    <div class="control-group">
-                        <label class="slider-label">Surface Charge Density (σ): {{chargeValue}} nC/m²</label>
-                        <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Sheet Size: {{surfaceLength}} px</label>
-                        <input type="range" v-model.number="surfaceLength" min="400" max="1500" step="100" class="range-slider">
-                    </div>
-                </div>
-
-                <div v-if="activeTopic === 'shell'" class="topic-controls">
-                    <h3>Thin Spherical Shell</h3>
-                    <div class="control-group">
-                        <label class="slider-label">Total Charge (Q): {{chargeValue}} nC</label>
-                        <input type="range" v-model.number="chargeValue" min="-50" max="50" step="1" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Shell Radius (R): {{shellRadius}} px</label>
-                        <input type="range" v-model.number="shellRadius" min="40" max="120" step="5" class="range-slider">
-                    </div>
-                    <div class="control-group">
-                        <label class="slider-label">Gaussian Radius (r): {{surfaceRadius}} px</label>
-                        <input type="range" v-model.number="surfaceRadius" min="20" max="250" step="5" class="range-slider">
-                    </div>
-                </div>
-
-                <div class="control-group">
-                    <label class="slider-label">Zoom Level: {{ zoom.toFixed(1) }}x</label>
-                    <input type="range" v-model.number="zoom" min="0.5" max="2" step="0.1" class="range-slider">
-                </div>
             </div>
         </ControlSidebar>
 
@@ -303,6 +327,7 @@ const fluxValue = computed(() => {
                 :zoom="zoom"
                 :charge="chargeValue"
                 :charge-pos="chargePos"
+                @update:charge-pos="chargePos = $event"
                 :solid-angle-dir="solidAngleDirection"
                 @update:solid-angle-dir="solidAngleDirection = $event"
                 :show-secondary="showSecondary"
@@ -311,12 +336,28 @@ const fluxValue = computed(() => {
                 :surface-length="surfaceLength"
                 :shell-radius="shellRadius"
                 :show-surface="showSurface"
-                :show-lines="showLines"
+                :show-lines="activeTopic === 'flux' ? showLines : true" 
                 :show-source="showSource"
                 :drawing-active="drawingActive"
+                :area-vector-shape="areaVectorShape"
+                :d-a-size="dASize"
+                :flux-source-type="fluxSourceType"
+                :plane-pos="planePos"
+                @update:plane-pos="planePos = $event"
+                :plane-rotation="planeRotation"
+                @update:plane-rotation="planeRotation = $event"
+                :wall-pos="wallPos"
+                @update:wall-pos="wallPos = $event"
+                :show-shadow="showShadow"
+                :show-area-vector="showAreaVector"
+                @update:flux-value="calculatedFlux = $event"
+                @update:theta-angle="thetaAngle = $event"
             />
 
             <!-- Viewport contains only simulation and controls now -->
+            
+            <!-- Info Overlay removed as per user guidance -->
+
             <!-- Zoom Controls -->
             <div class="zoom-controls">
                 <button @click="zoomIn" title="Zoom In">+</button>
@@ -353,7 +394,7 @@ const fluxValue = computed(() => {
     bottom: 0;
     width: 100%;
     overflow: hidden;
-    background: radial-gradient(circle at center, #0a0614 0%, #000 100%);
+    background: radial-gradient(circle at center, #0a192f 0%, #000 100%);
     display: flex;
     flex-direction: column;
 }
@@ -377,8 +418,9 @@ const fluxValue = computed(() => {
     flex-direction: column;
     gap: 0.5rem;
     padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    background: rgba(0, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 .toggle-label {
@@ -408,9 +450,9 @@ const fluxValue = computed(() => {
 }
 
 .status-indicator.inside {
-    background: rgba(0, 255, 157, 0.1);
-    color: #00ff9d;
-    border: 1px solid rgba(0, 255, 157, 0.2);
+    background: rgba(0, 255, 255, 0.1);
+    color: #00ffff;
+    border: 1px solid rgba(0, 255, 255, 0.2);
 }
 
 .range-slider {
@@ -420,13 +462,15 @@ const fluxValue = computed(() => {
     border-radius: 3px;
     outline: none;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 18px;
     height: 18px;
-    background: #00ff9d;
+    background: #00ffff;
     border-radius: 50%;
     cursor: pointer;
 }
@@ -442,11 +486,80 @@ const fluxValue = computed(() => {
     cursor: pointer;
 }
 
+.shape-dropdown option {
+    background: #0f172a;
+    color: white;
+}
+
 .topic-controls h3 {
     font-size: 1rem;
-    color: #00ff9d;
+    color: #00ffff;
     margin-bottom: 0.5rem;
     margin-top: 1rem;
+}
+
+.action-btn {
+    width: 100%;
+    padding: 10px;
+    background: rgba(0, 255, 255, 0.1);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    color: #00ffff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    margin: 5px 0;
+}
+
+.action-btn.danger {
+    background: rgba(255, 0, 85, 0.1);
+    border: 1px solid rgba(255, 0, 85, 0.3);
+    color: #ff0055;
+    margin-top: 10px;
+}
+
+.action-btn.danger:hover {
+    background: rgba(255, 0, 85, 0.2);
+    box-shadow: 0 0 10px rgba(255, 0, 85, 0.2);
+}
+
+.hint-text {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 4px;
+}
+
+.active-data {
+    background: rgba(0, 255, 255, 0.05);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 255, 255, 0.1);
+    margin-top: 15px;
+}
+
+.readout-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.readout-item:last-child {
+    margin-bottom: 0;
+}
+
+.readout-item .label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.readout-item .value {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    color: #00ffff;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 }
 
 /* Zoom Controls */
@@ -479,11 +592,11 @@ const fluxValue = computed(() => {
 }
 
 .zoom-controls button:hover {
-    background: rgba(0, 255, 157, 0.2);
-    border-color: #00ff9d;
-    color: #00ff9d;
+    background: rgba(0, 255, 255, 0.1);
+    border-color: #00ffff;
+    color: #00ffff;
     transform: scale(1.1) translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 255, 157, 0.2);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
 }
 
 .zoom-controls button:active {
@@ -530,7 +643,7 @@ const fluxValue = computed(() => {
 
 .data-card .value {
     font-size: 1.5rem;
-    color: #00ff9d;
+    color: #00ffff;
     font-weight: 700;
 }
 
@@ -542,7 +655,7 @@ const fluxValue = computed(() => {
 
 .formula-card {
     align-items: center;
-    border-left: 3px solid #00ff9d;
+    border-left: 3px solid #00ffff;
 }
 
 .description-card {
