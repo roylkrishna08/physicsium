@@ -13,7 +13,9 @@ const props = defineProps({
   zoom: {
     type: Number,
     default: 1
-  }
+  },
+  showPotential: Boolean,
+  showFieldLines: Boolean
 })
 
 const canvasRef = ref(null)
@@ -46,6 +48,14 @@ const forceValue = computed(() => {
     const q1 = Math.abs(charges.value[0].q) * UNIT_Q
     const q2 = Math.abs(charges.value[1].q) * UNIT_Q
     return (K * q1 * q2) / (r * r)
+})
+
+const potentialEnergy = computed(() => {
+    const r = distance.value / PIXELS_PER_METER
+    if (r < 0.05) return 0
+    const q1 = charges.value[0].q * UNIT_Q
+    const q2 = charges.value[1].q * UNIT_Q
+    return (K * q1 * q2) / r
 })
 
 onMounted(() => {
@@ -209,11 +219,109 @@ const draw = () => {
     // Draw everything else
     // ... drawing functions access charges which are already offsets ...
     
+    
+    if (props.showPotential) {
+        drawPotentialHeatmap(ctx, -cx/props.zoom, -cy/props.zoom, width.value/props.zoom, height.value/props.zoom)
+    }
+
     drawDistance(ctx)
+    if (props.showFieldLines) {
+        drawFieldLines(ctx)
+    }
     charges.value.forEach(drawCharge)
     drawForces(ctx)
 
     ctx.restore()
+}
+
+function getPotentialAt(x, y) {
+    let V = 0
+    for (const c of charges.value) {
+        const dx = x - c.x; const dy = y - c.y
+        const r = Math.sqrt(dx*dx + dy*dy)
+        if (r < 5) return c.q > 0 ? 1000 : -1000
+        V += (c.q * 100) / r
+    }
+    return V
+}
+
+function getFieldAt(x, y) {
+    let Ex = 0, Ey = 0
+    for (const c of charges.value) {
+        const dx = x - c.x; const dy = y - c.y
+        const r2 = dx*dx + dy*dy
+        const r = Math.sqrt(r2)
+        if (r < 20) return { Ex: 0, Ey: 0, hit: true }
+        const E = c.q / r2
+        Ex += E * (dx/r); Ey += E * (dy/r)
+    }
+    return { Ex, Ey, hit: false }
+}
+
+let offscreenCanvas = null
+let offscreenCtx = null
+
+function drawPotentialHeatmap(ctx, minX, minY, w, h) {
+    if (!offscreenCanvas) {
+        offscreenCanvas = document.createElement('canvas')
+        offscreenCtx = offscreenCanvas.getContext('2d')
+    }
+    const rect = canvasRef.value.getBoundingClientRect()
+    const scale = 0.1
+    const ow = Math.ceil(rect.width * scale)
+    const oh = Math.ceil(rect.height * scale)
+    if (offscreenCanvas.width !== ow || offscreenCanvas.height !== oh) {
+        offscreenCanvas.width = ow; offscreenCanvas.height = oh
+    }
+    const imgData = offscreenCtx.createImageData(ow, oh)
+    const data = imgData.data
+    for (let py = 0; py < oh; py++) {
+        for (let px = 0; px < ow; px++) {
+            const worldX = (px / scale - rect.width/2) / props.zoom
+            const worldY = (py / scale - rect.height/2) / props.zoom
+            const V = getPotentialAt(worldX, worldY)
+            const idx = (py * ow + px) * 4
+            const alpha = Math.min(Math.abs(V) * 0.5, 0.4) * 255
+            if (V > 0) {
+                data[idx] = 239; data[idx+1] = 68; data[idx+2] = 68; data[idx+3] = alpha
+            } else {
+                data[idx] = 59; data[idx+1] = 130; data[idx+2] = 246; data[idx+3] = alpha
+            }
+        }
+    }
+    offscreenCtx.putImageData(imgData, 0, 0)
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'screen'
+    ctx.drawImage(offscreenCanvas, 0, 0, rect.width, rect.height)
+    ctx.restore()
+}
+
+function drawFieldLines(ctx) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.lineWidth = 1.5
+    charges.value.forEach(c => {
+        const count = 16
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2
+            let cx = c.x + Math.cos(angle) * 25
+            let cy = c.y + Math.sin(angle) * 25
+            ctx.beginPath()
+            ctx.moveTo(cx, cy)
+            const ds = 10 * (c.q > 0 ? 1 : -1)
+            for (let step = 0; step < 200; step++) {
+                const f = getFieldAt(cx, cy)
+                if (f.hit) break
+                const Emod = Math.sqrt(f.Ex*f.Ex + f.Ey*f.Ey)
+                if (Emod < 1e-4) break
+                cx += (f.Ex / Emod) * ds
+                cy += (f.Ey / Emod) * ds
+                ctx.lineTo(cx, cy)
+                if (Math.abs(cx) > 2000 || Math.abs(cy) > 2000) break
+            }
+            ctx.stroke()
+        }
+    })
 }
 
 const drawGrid = (ctx, minX, minY, w, h) => {
@@ -508,6 +616,9 @@ onUnmounted(() => {
                     </div>
                     <div class="result">
                         F = {{ forceValue.toExponential(2) }} N
+                    </div>
+                    <div class="result" style="color: #10b981; border-top: none; padding-top: 0;">
+                        U = {{ potentialEnergy.toExponential(2) }} J
                     </div>
                 </div>
             </div>

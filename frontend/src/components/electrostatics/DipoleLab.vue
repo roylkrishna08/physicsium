@@ -40,6 +40,9 @@ const momentOfInertia = ref(2)
 const dampingFactor = ref(0.2)
 const showEquilibrium = ref(true)
 const isAnimating = ref(false)
+const showPotential = ref(false)
+const showEquipotentials = ref(false)
+const physicsData = ref({ p: 0, torque: 0, energy: 0 })
 
 // Point Charge State
 const pointCharges = ref([])
@@ -187,6 +190,14 @@ const viewportStyle = computed(() => ({
                     <input type="checkbox" v-model="showVectors">
                     Show Vectors
                 </label>
+                <label class="toggle-label">
+                    <input type="checkbox" v-model="showPotential">
+                    Show Potential Heatmap
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" v-model="showEquipotentials">
+                    Show Equipotential Lines
+                </label>
             </div>
 
             <!-- Point Charge Controls -->
@@ -300,6 +311,23 @@ const viewportStyle = computed(() => ({
                 <button class="btn-action" @click="isAnimating = !isAnimating" :style="{ background: isAnimating ? '#ef4444' : '#10b981' }">
                     {{ isAnimating ? 'Stop Animation' : 'Release Dipole' }}
                 </button>
+
+                <!-- Physics Readouts -->
+                <div class="control-group physics-readout" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                    <h3>Physics Data</h3>
+                    <div class="data-row">
+                        <span>Dipole Moment (p):</span>
+                        <span class="value">{{ physicsData.p.toFixed(2) }} q·a</span>
+                    </div>
+                    <div class="data-row">
+                        <span>Torque (τ):</span>
+                        <span class="value">{{ physicsData.torque.toFixed(2) }} N·m</span>
+                    </div>
+                    <div class="data-row">
+                        <span>Potential Energy (U):</span>
+                        <span class="value">{{ physicsData.energy.toFixed(2) }} J</span>
+                    </div>
+                </div>
             </div>
 
         </ControlSidebar>
@@ -328,7 +356,10 @@ const viewportStyle = computed(() => ({
                 :damping="dampingFactor"
                 :inertia="momentOfInertia"
                 :show-equilibrium="showEquilibrium"
+                :show-potential="showPotential"
+                :show-equipotentials="showEquipotentials"
                 @update:angle="dipoleAngle = $event" 
+                @update:physics="physicsData = $event"
             />
         </div>
 
@@ -541,5 +572,21 @@ const viewportStyle = computed(() => ({
     :deep(.control-sidebar-container) {
         width: 100% !important; /* Full width on tiny screens when open */
     }
+}
+
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+}
+.data-row .value {
+    font-family: monospace;
+    color: #00d4ff;
+    font-weight: bold;
+}
+.physics-readout h3 {
+    margin-bottom: 0.8rem !important;
+    color: #00d4ff !important;
 }
 </style>

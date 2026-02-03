@@ -113,6 +113,9 @@ const showGrid = ref(true)
 const coulombZoom = ref(1)
 const q1 = ref(2)
 const q2 = ref(-2)
+const showPotential = ref(false)
+const showFieldLines = ref(false)
+const showEquipotentials = ref(false)
 
 // Multiple Forces Lab
 const multipleLabRef = ref(null)
@@ -256,6 +259,20 @@ const updateCharge = (index, value) => {
                         Show Formula Calculation
                     </label>
                 </div>
+                
+                <div class="control-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" v-model="showPotential">
+                        Show Potential Heatmap
+                    </label>
+                </div>
+                
+                <div class="control-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" v-model="showFieldLines">
+                        Show Electric Field Lines
+                    </label>
+                </div>
             </div>
 
             <!-- Multiple Forces Lab Controls -->
@@ -339,6 +356,20 @@ const updateCharge = (index, value) => {
                     <label class="toggle-label">
                         <input type="checkbox" v-model="showGrid">
                         Show Gridlines
+                    </label>
+                </div>
+                
+                <div class="control-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" v-model="showPotential">
+                        Show Potential Heatmap
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" v-model="showFieldLines">
+                        Show Electric Field Lines
                     </label>
                 </div>
             </div>
@@ -531,6 +562,8 @@ const updateCharge = (index, value) => {
                     ref="coulombLabRef"
                     :show-formula="showCoulombFormula"
                     :show-grid="showGrid"
+                    :show-potential="showPotential"
+                    :show-field-lines="showFieldLines"
                     :zoom="coulombZoom"
                 />
 
@@ -540,6 +573,8 @@ const updateCharge = (index, value) => {
                     :show-grid="showGrid"
                     :zoom="coulombZoom"
                     :force-mode="forceMode"
+                    :show-potential="showPotential"
+                    :show-field-lines="showFieldLines"
                     @mousedown="updateMultipleSelection"
                     @click="updateMultipleSelection"
                 />

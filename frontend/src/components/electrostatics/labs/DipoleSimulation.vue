@@ -11,6 +11,8 @@ const props = defineProps({
   // Physics Params
   charges: { type: Array, default: () => [] }, // [{id, q, x, y}]
   testCharges: { type: Array, default: () => [] }, // [{id, x, y, trail: []}]
+  showPotential: Boolean,
+  showEquipotentials: Boolean,
   dipoleQ: { type: Number, default: 1 },
   dipoleSep: { type: Number, default: 100 },
   dipoles: { type: Array, default: () => [] }, // [{id, q, sep, x, y, phi}]
@@ -26,7 +28,7 @@ const props = defineProps({
   pointQ: { type: Number, default: 1 } 
 })
 
-const emit = defineEmits(['update:angle', 'update:charges', 'update:test-charges', 'update:dipoles'])
+const emit = defineEmits(['update:angle', 'update:charges', 'update:test-charges', 'update:dipoles', 'update:physics'])
 
 const canvasRef = ref(null)
 const containerRef = ref(null)
@@ -55,6 +57,10 @@ let isPinching = false
 // Simulation State
 const dipoleCenter = ref({ x: null, y: null }) // Persistent position in Field Mode
 const dipolePhi = ref(0) // Persistent rotation in radians
+
+let offscreenCanvas = null
+let offscreenCtx = null
+let lastPotentialParams = { k: 0, charges: '' }
 
 let currentAngle = props.torqueAngle
 let angularVelocity = 0
@@ -414,9 +420,20 @@ function updateTestCharges() {
             props.dipoles.forEach(d => {
                 const dc = { x: d.x !== null ? d.x : fallbackX, y: d.y !== null ? d.y : fallbackY }
                 const sep = d.sep; const phi = d.phi
-                sources.push({ x: dc.x - (sep/2) * Math.cos(phi), y: dc.y - (sep/2) * Math.sin(phi), q: d.q })
-                sources.push({ x: dc.x + (sep/2) * Math.cos(phi), y: dc.y + (sep/2) * Math.sin(phi), q: -d.q })
+                // Match draw(): +q at +sep/2, -q at -sep/2
+                sources.push({ x: dc.x + (sep/2) * Math.cos(phi), y: dc.y + (sep/2) * Math.sin(phi), q: d.q })
+                sources.push({ x: dc.x - (sep/2) * Math.cos(phi), y: dc.y - (sep/2) * Math.sin(phi), q: -d.q })
             })
+        }
+
+        // Uniform Field in Torque Mode
+        if (props.mode === 'torque') {
+            const angleRad = (props.torqueEAngle * Math.PI) / 180
+            // E = (Ex, Ey) = (E * cos(theta), E * sin(theta))
+            // But torque mode currently assumes field is fixed? 
+            // torqueEAngle prop exists.
+            Ex += props.torqueE * Math.cos(angleRad) * 0.1 // Scale for physical consistency with point charges
+            Ey += props.torqueE * Math.sin(angleRad) * 0.1
         }
 
         if (sources.length === 0) return tc
@@ -481,7 +498,7 @@ function animate(time) {
     let needsAnimation = false
 
     // 1. Test Charge Physics
-    if ((props.mode === 'point_charge' || props.mode === 'dipole_field') && props.testCharges.length > 0) {
+    if ((props.mode === 'point_charge' || props.mode === 'dipole_field' || props.mode === 'torque') && props.testCharges.length > 0) {
         updateTestCharges()
         needsAnimation = true
     }
@@ -504,6 +521,25 @@ function animate(time) {
     if (props.showFieldLines) {
         flowOffset = (flowOffset + dt * 40) % 25
         needsAnimation = true
+    }
+    
+    // 4. Update Physics Readouts
+    if (props.mode === 'torque') {
+        const p = props.torqueP // scale
+        const E = props.torqueE // scale
+        const angleRad = (currentAngle * Math.PI) / 180
+        const fieldAngleRad = (props.torqueEAngle * Math.PI) / 180
+        const relAngle = angleRad - fieldAngleRad
+        
+        const tau = p * E * Math.sin(relAngle)
+        const U = -p * E * Math.cos(relAngle)
+        
+        emit('update:physics', {
+            p,
+            torque: tau,
+            energy: U,
+            angle: currentAngle
+        })
     }
 
     draw()
@@ -536,6 +572,131 @@ function getFieldAt(x, y, charges, fallbackX, fallbackY) {
         Ey += E * (dy/r)
     }
     return { Ex, Ey, hit }
+}
+
+function getPotentialAt(x, y, charges, fallbackX, fallbackY) {
+    let V = 0
+    for (const other of charges) {
+        const ox = typeof other.x === 'number' ? other.x : fallbackX
+        const oy = typeof other.y === 'number' ? other.y : fallbackY
+        const dx = x - ox; const dy = y - oy
+        const r = Math.sqrt(dx*dx + dy*dy)
+        
+        if (r < 5) return other.q > 0 ? 1000 : -1000
+        V += (other.q * 100) / r // Scale potential for visual range
+    }
+    return V
+}
+
+function drawPotentialHeatmap(ctx, visible, charges, fallbackX, fallbackY) {
+    if (!offscreenCanvas) {
+        offscreenCanvas = document.createElement('canvas')
+        offscreenCtx = offscreenCanvas.getContext('2d')
+    }
+
+    const rect = canvasRef.value.getBoundingClientRect()
+    const scale = 0.1 // Low resolution for performance
+    const w = Math.ceil(rect.width * scale)
+    const h = Math.ceil(rect.height * scale)
+
+    if (offscreenCanvas.width !== w || offscreenCanvas.height !== h) {
+        offscreenCanvas.width = w
+        offscreenCanvas.height = h
+    }
+
+    const imgData = offscreenCtx.createImageData(w, h)
+    const data = imgData.data
+
+    for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+            const worldPos = toWorld(px / scale, py / scale)
+            const V = getPotentialAt(worldPos.x, worldPos.y, charges, fallbackX, fallbackY)
+            
+            const idx = (py * w + px) * 4
+            // Map potential to Red (-ve) / Blue (+ve)
+            // Wait, Standard: +ve is Red, -ve is Blue
+            const alpha = Math.min(Math.abs(V) * 0.5, 0.4) * 255
+            if (V > 0) {
+                data[idx] = 239; data[idx+1] = 68; data[idx+2] = 68; data[idx+3] = alpha
+            } else {
+                data[idx] = 59; data[idx+1] = 130; data[idx+2] = 246; data[idx+3] = alpha
+            }
+        }
+    }
+
+    offscreenCtx.putImageData(imgData, 0, 0)
+    
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0) // Identity for drawing offscreen
+    ctx.globalCompositeOperation = 'screen'
+    ctx.drawImage(offscreenCanvas, 0, 0, rect.width, rect.height)
+    ctx.restore()
+}
+
+function drawEquipotentials(ctx, visible, charges, fallbackX, fallbackY) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
+    ctx.lineWidth = 1
+    
+    // Potential levels to draw
+    const levels = [-200, -150, -100, -75, -50, -25, 25, 50, 75, 100, 150, 200]
+    
+    levels.forEach(Vtarget => {
+        // Find a starting point for this potential level
+        // For simple point charges, we can look along lines from the charge
+        charges.forEach(c => {
+            const count = 8
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2 + (c.phi || 0)
+                // Search for Vtarget along this ray
+                let rLow = 30, rHigh = 2000
+                let rStart = -1
+                for (let iter = 0; iter < 10; iter++) {
+                    const rMid = (rLow + rHigh) / 2
+                    const testX = c.x + Math.cos(angle) * rMid
+                    const testY = c.y + Math.sin(angle) * rMid
+                    const V = getPotentialAt(testX, testY, charges, fallbackX, fallbackY)
+                    if (Math.abs(V - Vtarget) < 1) { rStart = rMid; break; }
+                    if (c.q > 0) {
+                        if (V > Vtarget) rLow = rMid; else rHigh = rMid
+                    } else {
+                        if (V < Vtarget) rLow = rMid; else rHigh = rMid
+                    }
+                }
+
+                if (rStart > 0) {
+                    // Trace equipotential from here
+                    let cx = c.x + Math.cos(angle) * rStart
+                    let cy = c.y + Math.sin(angle) * rStart
+                    
+                    ctx.beginPath()
+                    ctx.moveTo(cx, cy)
+                    const step = 5
+                    for (let s = 0; s < 500; s++) {
+                        const field = getFieldAt(cx, cy, charges, fallbackX, fallbackY)
+                        if (field.hit) break
+                        const Emod = Math.sqrt(field.Ex*field.Ex + field.Ey*field.Ey)
+                        if (Emod < 1e-4) break
+                        
+                        // Move perpendicular to field: (Ex, Ey) -> (Ey, -Ex)
+                        const dx = (field.Ey / Emod) * step
+                        const dy = (-field.Ex / Emod) * step
+                        cx += dx
+                        cy += dy
+                        
+                        if (cx < visible.left - 200 || cx > visible.right + 200 || cy < visible.top - 200 || cy > visible.bottom + 200) break
+                        ctx.lineTo(cx, cy)
+                        
+                        // Close loop check
+                        if (s > 10 && Math.hypot(cx - (c.x + Math.cos(angle) * rStart), cy - (c.y + Math.sin(angle) * rStart)) < 5) {
+                            ctx.closePath()
+                            break
+                        }
+                    }
+                    ctx.stroke()
+                }
+            }
+        })
+    })
 }
 
 // --- Drawing Helpers ---
@@ -724,9 +885,17 @@ function drawFieldLinesMulti(ctx, visible, charges) {
          if (c.q === 0) return
          const isPos = c.q > 0
          
+         // Fix: For negative charges, we still start from the charge but integrate backwards (ds negative)
+         // OR we integrate normally but reverse the visual flow. 
+         // Better: integrate along the field direction (ds > 0 always) but start further out if negative.
+         // Actually, the current logic uses ds = 10 * (isPos ? 1 : -1) which is correct for starting AT the charge.
+         // To fix the VISUAL flow, we need to adjust lineDashOffset based on polarity.
+         
          const count = Math.max(8, Math.floor(Math.abs(c.q) * 4)) 
          for (let i = 0; i < count; i++) {
-            let angle = (i / count) * Math.PI * 2
+            // Stability Fix: Start angles relative to charge orientation (if it's part of a dipole)
+            // This prevents lines from "sliding" around the charge as the dipole rotates.
+            let angle = (i / count) * Math.PI * 2 + (c.phi || 0)
             let cx = (typeof c.x === 'number' ? c.x : fallbackX) + Math.cos(angle) * 28 
             let cy = (typeof c.y === 'number' ? c.y : fallbackY) + Math.sin(angle) * 28
             
@@ -771,8 +940,11 @@ function drawFieldLinesMulti(ctx, visible, charges) {
                 
                 // Bounds Check
                 if (cx < visible.left - 500 || cx > visible.right + 500 || cy < visible.top - 500 || cy > visible.bottom + 500) break;
-                ctx.lineTo(cx, cy)
+                 ctx.lineTo(cx, cy)
             }
+            
+            // Set flow direction: positive flows OUT, negative flows IN
+            ctx.lineDashOffset = isPos ? -flowOffset : flowOffset
             ctx.stroke()
          }
     })
@@ -919,10 +1091,10 @@ function draw() {
     ctx.translate(t.x, t.y)
     ctx.scale(t.k, t.k)
     
-    // Center logic (World Center = w/2, h/2 of initial view roughly)
-    // We use w/2, h/2 as the "Default Center" coordinate
-    const cx = w/2
-    const cy = h/2
+    // Center logic (World Center = transformed viewport center)
+    const centerWorld = toWorld(w/2, h/2)
+    const cx = centerWorld.x
+    const cy = centerWorld.y
 
     if (props.showGrid) drawGrid(ctx, visible)
 
@@ -951,11 +1123,19 @@ function draw() {
             const x1 = dc.x - (sep/2) * Math.cos(phi); const y1 = dc.y - (sep/2) * Math.sin(phi)
             const x2 = dc.x + (sep/2) * Math.cos(phi); const y2 = dc.y + (sep/2) * Math.sin(phi)
             
-            allCharges.push({ x: x1, y: y1, q: q })
-            allCharges.push({ x: x2, y: y2, q: -q })
+            // Match drawDipoleStick: +q is at local +size (angle phi), -q is at local -size (angle phi + PI)
+            allCharges.push({ x: x2, y: y2, q: q, phi: phi })
+            allCharges.push({ x: x1, y: y1, q: -q, phi: phi })
             
         })
 
+        if (props.showPotential && allCharges.length > 0) {
+            drawPotentialHeatmap(ctx, visible, allCharges, cx, cy)
+        }
+
+        if (props.showEquipotentials && allCharges.length > 0) {
+            drawEquipotentials(ctx, visible, allCharges, cx, cy)
+        }
         if (props.showFieldLines && allCharges.length > 0) {
             drawFieldLinesMulti(ctx, visible, allCharges)
         }
@@ -1114,7 +1294,6 @@ onMounted(() => {
         
         const canvas = canvasRef.value
         canvas.addEventListener('wheel', handleWheel, { passive: false })
-        canvas.addEventListener('wheel', handleWheel, { passive: false })
         canvas.addEventListener('mousedown', handleMouseDown)
         window.addEventListener('mousemove', handleMouseMove)
         window.addEventListener('mouseup', handleMouseUp)
@@ -1198,8 +1377,8 @@ watch(() => props.dipoles, (newDipoles) => {
             const rect = canvas.getBoundingClientRect()
             const centerWorld = toWorld(rect.width / 2, rect.height / 2)
             
-            // Much larger staggered spawning
-            const offset = 80 + (idx * 120) % 400
+            // First one is centered, others are staggered
+            const offset = idx === 0 ? 0 : 80 + (idx * 120) % 400
             const xDir = idx % 2 === 0 ? 1 : -1
             const yDir = idx % 3 === 0 ? 1 : -1
             return { 
