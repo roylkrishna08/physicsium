@@ -14,7 +14,7 @@
 
 <script setup>
 import KinematicsBackground from '../../../components/backgrounds/KinematicsBackground.vue'
-import KinematicsNavBar from '../../../components/kinematics/KinematicsNavBar.vue'
+import KinematicsNavBar from '../../../components/unit/kinematics/KinematicsNavBar.vue'
 
 defineProps({
   topicTitle: {

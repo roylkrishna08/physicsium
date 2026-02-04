@@ -97,3 +97,32 @@ exports.deleteUser = asyncHandler(async (req, res, next) => {
         data: {},
     });
 });
+// @desc    Reset user password
+// @route   PUT /api/admin/users/:id/reset-password
+// @access  Private/Manager/Owner
+exports.resetUserPassword = asyncHandler(async (req, res, next) => {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+        return next(new ErrorResponse(`User not found with id of ${req.params.id}`, 404));
+    }
+
+    // Managers can't reset passwords for other managers or owners
+    if (req.user.role === 'manager' && user.role !== 'user') {
+        return next(new ErrorResponse('Not authorized to reset this user\'s password', 403));
+    }
+
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+        return next(new ErrorResponse('Please provide a new password with at least 6 characters', 400));
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+        success: true,
+        message: 'Password reset successfully',
+    });
+});

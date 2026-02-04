@@ -2,6 +2,9 @@
 import { useSearch } from '../../composables/useSearch.js'
 import { useRoute } from 'vue-router'
 import { ref, nextTick } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+
+const authStore = useAuthStore()
 
 const { searchQuery } = useSearch()
 const isSearchOpen = ref(false)
@@ -73,8 +76,14 @@ const setExam = (exam) => {
     <div class="links" :class="{ 'is-open': isMenuOpen }">
       <router-link to="/" @click="closeMenu">Home</router-link>
       <router-link to="/syllabus" @click="closeMenu">Syllabus</router-link>
-      <router-link to="/topics" @click="closeMenu">Topics</router-link>
+      <router-link to="/topics" @click="closeMenu">Simulations</router-link>
       <router-link to="/#practice" @click="closeMenu">Free Resources</router-link>
+      
+      <!-- Mobile Auth Links -->
+      <template v-if="!authStore.isAuthenticated">
+        <router-link to="/login" class="mobile-only md:hidden" @click="closeMenu">Login</router-link>
+        <router-link to="/signup" class="mobile-only md:hidden" @click="closeMenu">Sign Up</router-link>
+      </template>
     </div>
     
     <div class="controls">
@@ -149,6 +158,16 @@ const setExam = (exam) => {
     align-items: center;
     gap: 1rem;
     margin-right: 3rem;
+}
+
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+    }
 }
 
 

@@ -39,6 +39,11 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse('Password is incorrect', 401));
     }
 
+    // Check new password length
+    if (req.body.newPassword && req.body.newPassword.length < 6) {
+        return next(new ErrorResponse('New password must be at least 6 characters', 400));
+    }
+
     user.password = req.body.newPassword;
     await user.save();
 
@@ -62,6 +67,38 @@ exports.updateProfilePicture = asyncHandler(async (req, res, next) => {
     res.status(200).json({
         success: true,
         data: user,
+    });
+});
+
+// @desc    Delete user account
+// @route   DELETE /api/users/account
+// @access  Private
+exports.deleteAccount = asyncHandler(async (req, res, next) => {
+    const { password } = req.body;
+
+    if (!password) {
+        return next(new ErrorResponse('Please provide your password to confirm', 400));
+    }
+
+    const user = await User.findById(req.user.id).select('+password');
+
+    if (!user) {
+        return next(new ErrorResponse('User not found', 404));
+    }
+
+    // Verify password
+    const isMatch = await user.matchPassword(password);
+
+    if (!isMatch) {
+        return next(new ErrorResponse('Password is incorrect', 401));
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(req.user.id);
+
+    res.status(200).json({
+        success: true,
+        message: 'Account deleted successfully'
     });
 });
 

@@ -3,10 +3,10 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ElectrostaticsNavBar from './ElectrostaticsNavBar.vue'
 import ChargeSidebar from './ChargeSidebar.vue'
-import ControlSidebar from '../ui/ControlSidebar.vue'
+import ControlSidebar from '../../ui/ControlSidebar.vue'
 import DipoleSimulation from './labs/DipoleSimulation.vue'
-import DrawingCanvas from '../drawingTool/DrawingCanvas.vue'
-import DrawingSidebar from '../drawingTool/DrawingSidebar.vue'
+import DrawingCanvas from '../../drawingTool/DrawingCanvas.vue'
+import DrawingSidebar from '../../drawingTool/DrawingSidebar.vue'
 
 const router = useRouter()
 

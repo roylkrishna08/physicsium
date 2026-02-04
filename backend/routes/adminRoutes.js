@@ -5,6 +5,7 @@ const {
     restrictUser,
     updateUserRole,
     deleteUser,
+    resetUserPassword,
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.use(protect);
 router.get('/users', authorize('manager', 'owner'), getUsers);
 router.get('/users/:id', authorize('manager', 'owner'), getUser);
 router.put('/users/:id/restrict', authorize('manager', 'owner'), restrictUser);
+router.put('/users/:id/reset-password', authorize('manager', 'owner'), resetUserPassword);
 
 // Owner only routes
 router.put('/users/:id/role', authorize('owner'), updateUserRole);

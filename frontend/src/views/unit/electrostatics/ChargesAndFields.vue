@@ -1,5 +1,5 @@
 <script setup>
-import ChargeLab from '../../../components/electrostatics/ChargeLab.vue'
+import ChargeLab from '../../../components/unit/electrostatics/ChargeLab.vue'
 defineProps(['activeExam'])
 </script>
 

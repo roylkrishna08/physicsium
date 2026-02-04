@@ -2,15 +2,15 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ChargeSidebar from './ChargeSidebar.vue'
-import ControlSidebar from '../ui/ControlSidebar.vue'
+import ControlSidebar from '../../ui/ControlSidebar.vue'
 import ElectrostaticsNavBar from './ElectrostaticsNavBar.vue'
 import ConservationLab from './labs/ConservationLab.vue'
 import CoulombLab from './labs/CoulombLab.vue'
 import MultipleForcesLab from './labs/MultipleForcesLab.vue'
 import ChargeDistributionLab from './labs/ChargeDistributionLab.vue'
 import Continuous3DLab from './labs/Continuous3DLab.vue'
-import DrawingCanvas from '../drawingTool/DrawingCanvas.vue'
-import DrawingSidebar from '../drawingTool/DrawingSidebar.vue'
+import DrawingCanvas from '../../drawingTool/DrawingCanvas.vue'
+import DrawingSidebar from '../../drawingTool/DrawingSidebar.vue'
 
 const router = useRouter()
 

@@ -55,9 +55,9 @@ const props = defineProps({
       <section id="banner" class="glass-card banner floating">
          <div class="banner-content">
              <h2>Ready to decode the universe?</h2>
-             <p>Start your journey with the complete {{ activeExam }} syllabus breakdown.</p>
+             <p>Start your journey and master the concepts of physics with us.</p>
          </div>
-         <router-link to="/syllabus" class="btn-primary">View Syllabus</router-link>
+         <router-link to="/login" class="btn-primary">Start Learning</router-link>
       </section>
     </main>
   </div>

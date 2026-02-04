@@ -3,6 +3,7 @@ const {
     updateDetails,
     updatePassword,
     updateProfilePicture,
+    deleteAccount,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -15,5 +16,6 @@ router.use(protect);
 router.put('/updatedetails', updateDetails);
 router.put('/updatepassword', updatePassword);
 router.put('/profilepicture', upload.single('image'), updateProfilePicture);
+router.delete('/account', deleteAccount);
 
 module.exports = router;

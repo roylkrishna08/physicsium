@@ -20,7 +20,7 @@ import SolarSystem from './SolarSystem.vue'
         Visualise concepts, master properties, and ace your JEE & NEET exams with our premium interactive learning platform.
       </p>
       <div class="hero-actions">
-        <router-link to="/topics" class="btn-primary">Start Learning Free</router-link>
+        <router-link to="/login" class="btn-primary">Start Learning</router-link>
         <router-link to="/mission-2027" class="btn-outline">Mission 2027</router-link>
       </div>
       

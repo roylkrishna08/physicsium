@@ -1,8 +1,8 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import GravitationBackground from '../../components/gravitation/GravitationBackground.vue'
-import GravitationNavBar from '../../components/gravitation/GravitationNavBar.vue'
-import TopicCard from '../../components/ui/TopicCard.vue'
+import GravitationBackground from '../../../components/unit/gravitation/GravitationBackground.vue'
+import GravitationNavBar from '../../../components/unit/gravitation/GravitationNavBar.vue'
+import TopicCard from '../../../components/ui/TopicCard.vue'
 
 const router = useRouter()
 

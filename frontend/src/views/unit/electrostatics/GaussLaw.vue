@@ -1,5 +1,5 @@
 <script setup>
-import GaussLawLab from '../../../components/electrostatics/GaussLawLab.vue'
+import GaussLawLab from '../../../components/unit/electrostatics/GaussLawLab.vue'
 defineProps(['activeExam'])
 </script>
 

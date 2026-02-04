@@ -1,5 +1,5 @@
 <script setup>
-import DipoleLab from '../../../components/electrostatics/DipoleLab.vue'
+import DipoleLab from '../../../components/unit/electrostatics/DipoleLab.vue'
 defineProps(['activeExam'])
 </script>
 

@@ -1,10 +1,13 @@
 <script setup>
-import { ref } from 'vue'
-import GravitationSidebar from '../../components/gravitation/GravitationSidebar.vue'
-import GravitationBackground from '../../components/gravitation/GravitationBackground.vue'
-import GravitationNavBar from '../../components/gravitation/GravitationNavBar.vue'
+import { ref, onMounted } from 'vue'
+import GravitationSidebar from '../../../components/unit/gravitation/GravitationSidebar.vue'
+import GravitationBackground from '../../../components/unit/gravitation/GravitationBackground.vue'
+import GravitationNavBar from '../../../components/unit/gravitation/GravitationNavBar.vue'
+import NewtonLawLab from '../../../components/unit/gravitation/labs/NewtonLawLab.vue'
 
 const isSidebarOpen = ref(true)
+
+// Simple animation logic could go here
 </script>
 
 <template>
@@ -17,79 +20,73 @@ const isSidebarOpen = ref(true)
       
       <!-- Hero Header -->
       <header class="topic-header">
-        <div class="pill">GRAVITY ON EARTH</div>
-        <h1>Acceleration Due to Gravity</h1>
-        <p class="subtitle">Why apples fall and satellites orbit: understanding 'g' and how it changes.</p>
+        <div class="pill">NEWTON'S LAW</div>
+        <h1>Universal Law of Gravitation</h1>
+        <p class="subtitle">The force that binds the cosmos, from the smallest pebble to the largest galaxy.</p>
       </header>
 
       <!-- Main Content Grid -->
       <div class="content-grid">
         
-        <!-- Definition Card -->
+        <!-- Statement Card -->
         <div class="glass-card full-width">
-          <h2>Defining 'g'</h2>
-          <p>
-            The acceleration gained by an object due to the gravitational force is called <strong>acceleration due to gravity</strong> (<i>g</i>). 
-            on the surface of Earth, its standard value is approximately <strong>9.8 m/s²</strong>.
-          </p>
+          <h2>The Statement</h2>
+          <p>Every particle of matter in the universe attracts every other particle with a force that is:</p>
           <ul class="feature-list">
-            <li>It is a <strong>vector quantity</strong> directed towards the center of the Earth.</li>
-            <li>It is independent of the mass, shape, or size of the body (in a vacuum).</li>
+            <li><strong>Directly proportional</strong> to the product of their masses (<i>m<sub>1</sub></i> and <i>m<sub>2</sub></i>).</li>
+            <li><strong>Inversely proportional</strong> to the square of the distance (<i>r</i>) between their centers.</li>
           </ul>
         </div>
 
         <!-- Formula Card -->
         <div class="glass-card highlight">
-          <h2>Relation between g and G</h2>
+          <h2>The Formula</h2>
           <div class="formula-container">
             <div class="formula">
-              g = <div class="fraction"><span class="numerator">GM</span><span class="denominator">R<sup>2</sup></span></div>
+              F = G <div class="fraction"><span class="numerator">m<sub>1</sub> m<sub>2</sub></span><span class="denominator">r<sup>2</sup></span></div>
             </div>
           </div>
           <div class="variable-grid">
             <div class="variable-item">
-              <span class="symbol">g</span>
-              <span class="desc">Acceleration due to gravity</span>
+              <span class="symbol">F</span>
+              <span class="desc">Gravitational Force</span>
             </div>
             <div class="variable-item">
               <span class="symbol">G</span>
-              <span class="desc">Gravitational Constant</span>
+              <span class="desc">Universal Gravitational Constant<br><small>(6.674 × 10<sup>-11</sup> N·m²/kg²)</small></span>
             </div>
             <div class="variable-item">
-              <span class="symbol">M</span>
-              <span class="desc">Mass of Earth</span>
+              <span class="symbol">m<sub>1</sub>, m<sub>2</sub></span>
+              <span class="desc">Masses of objects</span>
             </div>
             <div class="variable-item">
-              <span class="symbol">R</span>
-              <span class="desc">Radius of Earth</span>
+              <span class="symbol">r</span>
+              <span class="desc">Distance between centers</span>
             </div>
           </div>
         </div>
 
-        <!-- Variation Card -->
+        <!-- Interactive Simulation -->
+        <div class="full-width">
+            <NewtonLawLab />
+        </div>
+
+        <!-- Significance -->
         <div class="glass-card full-width">
-          <h2>Variation of 'g'</h2>
+          <h2>Why It Matters</h2>
+          <p>This single law explains a multitude of phenomena:</p>
           <div class="grid-list">
             <div class="grid-item">
-              <span class="icon">🏔️</span>
-              <div>
-                <strong>With Altitude (h)</strong>
-                <p>Value decreases as you go up. <i>g<sub>h</sub> = g(1 - 2h/R)</i></p>
-              </div>
+              <span class="icon">🌑</span>
+              <span>The motion of the moon around the Earth</span>
             </div>
             <div class="grid-item">
-              <span class="icon">🕳️</span>
-              <div>
-                <strong>With Depth (d)</strong>
-                <p>Value decreases as you go down. <i>g<sub>d</sub> = g(1 - d/R)</i></p>
-              </div>
+              <span class="icon">☀️</span>
+              <span>The motion of planets around the Sun</span>
             </div>
             <div class="grid-item">
-              <span class="icon">🌍</span>
-              <div>
-                <strong>At Poles vs Equator</strong>
-                <p>Max at poles, min at equator due to Earth's shape and rotation.</p>
-              </div>
+              <span class="icon">🌊</span>
+              <span>The tides due to the moon and the Sun</span>
             </div>
           </div>
         </div>
@@ -111,7 +108,7 @@ const isSidebarOpen = ref(true)
   position: relative;
   z-index: 10;
   padding: 2rem;
-  padding-top: 150px;
+  padding-top: 150px; /* Increased to clear the floating navbar */
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   margin-left: 0;
   max-width: 1200px;
@@ -131,9 +128,9 @@ const isSidebarOpen = ref(true)
 .pill {
   display: inline-block;
   padding: 4px 12px;
-  background: rgba(52, 211, 153, 0.1);
-  border: 1px solid rgba(52, 211, 153, 0.3);
-  color: #34d399;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #60a5fa;
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -145,7 +142,7 @@ h1 {
   font-size: 3.5rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  background: linear-gradient(135deg, #fff, #6ee7b7);
+  background: linear-gradient(135deg, #fff, #93c5fd);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -172,12 +169,12 @@ h1 {
 .glass-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  border-color: rgba(52, 211, 153, 0.2);
+  border-color: rgba(96, 165, 250, 0.2);
 }
 
 .glass-card.highlight {
-  background: linear-gradient(145deg, rgba(6, 78, 59, 0.4), rgba(2, 44, 34, 0.4));
-  border: 1px solid rgba(52, 211, 153, 0.2);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.7));
+  border: 1px solid rgba(96, 165, 250, 0.2);
 }
 
 .content-grid {
@@ -204,7 +201,7 @@ h2::before {
   display: block;
   width: 4px;
   height: 24px;
-  background: #34d399;
+  background: #60a5fa;
   border-radius: 2px;
 }
 
@@ -228,7 +225,7 @@ p, li {
 
 .feature-list li::before {
   content: '•';
-  color: #34d399;
+  color: #60a5fa;
   position: absolute;
   left: 0;
   font-size: 1.2rem;
@@ -284,7 +281,7 @@ p, li {
   display: block;
   font-family: 'Times New Roman', serif;
   font-size: 1.5rem;
-  color: #34d399;
+  color: #60a5fa;
   margin-bottom: 0.5rem;
   font-style: italic;
 }
@@ -294,24 +291,79 @@ p, li {
   color: #94a3b8;
 }
 
+/* Visualization Styles */
+.visualization-stage {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  position: relative;
+  margin: 2rem 0;
+}
+
+.mass {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+  font-weight: bold;
+  z-index: 2;
+}
+
+.mass-2 {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle at 30% 30%, #f472b6, #db2777);
+  box-shadow: 0 0 20px rgba(244, 114, 182, 0.3);
+}
+
+.force-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.distance-label {
+  background: #0f172a;
+  padding: 0 0.5rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.caption {
+  text-align: center;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* Grid List */
 .grid-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
 }
 
 .grid-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
-  padding: 1.5rem;
+  padding: 1rem;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
 }
 
 .icon {
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 
 /* Animations */
@@ -322,12 +374,17 @@ p, li {
 
 @media (max-width: 768px) {
   .content {
-    margin-left: 0 !important;
+    margin-left: 0 !important; /* Force no margin on mobile overlap */
     padding: 1.5rem;
     padding-top: 100px;
   }
   
-  h1 { font-size: 2.5rem; }
-  .content-grid { grid-template-columns: 1fr; }
+  h1 {
+    font-size: 2.5rem;
+  }
+  
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

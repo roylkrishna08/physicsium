@@ -2,11 +2,11 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ChargeSidebar from './ChargeSidebar.vue'
-import ControlSidebar from '../ui/ControlSidebar.vue'
+import ControlSidebar from '../../ui/ControlSidebar.vue'
 import ElectrostaticsNavBar from './ElectrostaticsNavBar.vue'
 import GaussLawSimulation from './labs/GaussLawSimulation.vue'
-import DrawingCanvas from '../drawingTool/DrawingCanvas.vue'
-import DrawingSidebar from '../drawingTool/DrawingSidebar.vue'
+import DrawingCanvas from '../../drawingTool/DrawingCanvas.vue'
+import DrawingSidebar from '../../drawingTool/DrawingSidebar.vue'
 
 const router = useRouter()
 

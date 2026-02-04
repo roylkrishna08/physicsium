@@ -42,22 +42,26 @@ const router = createRouter({
         {
             path: '/topics',
             name: 'topics',
-            component: Topics
+            component: Topics,
+            meta: { requiresAuth: true }
         },
         {
             path: '/experiments',
             name: 'experiments',
-            component: Experiments
+            component: Experiments,
+            meta: { requiresAuth: true }
         },
         {
             path: '/lab',
             name: 'lab-index',
-            component: Lab
+            component: Lab,
+            meta: { requiresAuth: true }
         },
         {
             path: '/lab/:id',
             name: 'lab',
-            component: Lab
+            component: Lab,
+            meta: { requiresAuth: true }
         },
         {
             path: '/mission-2027',
@@ -66,27 +70,29 @@ const router = createRouter({
         },
         {
             path: '/electrostatics',
+            meta: { requiresAuth: true },
             children: [
                 { path: '', name: 'electrostatics-index', component: ElectrostaticsIndex },
-                { path: 'charges', name: 'charges', component: ChargesAndFields, meta: { hideNav: true } },
-                { path: 'dipole', name: 'dipole', component: FieldAndDipole, meta: { hideNav: true } },
-                { path: 'gauss', name: 'gauss', component: GaussLaw, meta: { hideNav: true } },
-                { path: 'gausslaw', name: 'gausslaw', component: GaussLaw, meta: { hideNav: true } },
-                { path: 'potential', name: 'potential', component: Potential, meta: { hideNav: true } },
-                { path: 'capacitors', name: 'capacitors', component: Capacitors, meta: { hideNav: true } }
+                { path: 'charges', name: 'charges', component: ChargesAndFields, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'dipole', name: 'dipole', component: FieldAndDipole, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'gauss', name: 'gauss', component: GaussLaw, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'gausslaw', name: 'gausslaw', component: GaussLaw, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'potential', name: 'potential', component: Potential, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'capacitors', name: 'capacitors', component: Capacitors, meta: { hideNav: true, requiresAuth: true } }
             ]
         },
         {
             path: '/kinematics',
+            meta: { requiresAuth: true },
             children: [
                 { path: '', name: 'kinematics-index', component: KinematicsIndex },
-                { path: 'frame-of-reference', name: 'frame-of-reference', component: FrameOfReference, meta: { hideNav: true } },
-                { path: 'straight-line', name: 'straight-line', component: StraightLineMotion, meta: { hideNav: true } },
-                { path: 'acceleration', name: 'acceleration', component: Acceleration, meta: { hideNav: true } },
-                { path: 'graphs', name: 'kinematic-graphs', component: KinematicGraphs, meta: { hideNav: true } },
-                { path: 'relative-velocity', name: 'relative-velocity', component: RelativeVelocity, meta: { hideNav: true } },
-                { path: 'projectile', name: 'projectile', component: ProjectileMotion, meta: { hideNav: true } },
-                { path: 'circular', name: 'circular', component: CircularMotion, meta: { hideNav: true } }
+                { path: 'frame-of-reference', name: 'frame-of-reference', component: FrameOfReference, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'straight-line', name: 'straight-line', component: StraightLineMotion, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'acceleration', name: 'acceleration', component: Acceleration, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'graphs', name: 'kinematic-graphs', component: KinematicGraphs, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'relative-velocity', name: 'relative-velocity', component: RelativeVelocity, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'projectile', name: 'projectile', component: ProjectileMotion, meta: { hideNav: true, requiresAuth: true } },
+                { path: 'circular', name: 'circular', component: CircularMotion, meta: { hideNav: true, requiresAuth: true } }
             ]
         },
         {
@@ -99,19 +105,21 @@ const router = createRouter({
         },
         {
             path: '/gravitation',
+            meta: { requiresAuth: true },
             children: [
-                { path: '', name: 'gravitation-index', component: () => import('../views/gravitation/GravitationLayout.vue') },
-                { path: 'universal-law', name: 'universal-law', component: () => import('../views/gravitation/UniversalLaw.vue') },
-                { path: 'acceleration', name: 'acceleration', component: () => import('../views/gravitation/AccelerationGravity.vue') },
-                { path: 'kepler', name: 'kepler', component: () => import('../views/gravitation/KeplersLaws.vue') },
-                { path: 'potential', name: 'potential', component: () => import('../views/gravitation/GravitationalPotential.vue') },
-                { path: 'satellite', name: 'satellite', component: () => import('../views/gravitation/SatelliteMotion.vue') }
+                { path: '', name: 'gravitation-index', component: () => import('../views/unit/gravitation/GravitationLayout.vue') },
+                { path: 'universal-law', name: 'universal-law', component: () => import('../views/unit/gravitation/UniversalLaw.vue'), meta: { requiresAuth: true } },
+                { path: 'acceleration', name: 'acceleration', component: () => import('../views/unit/gravitation/AccelerationGravity.vue'), meta: { requiresAuth: true } },
+                { path: 'kepler', name: 'kepler', component: () => import('../views/unit/gravitation/KeplersLaws.vue'), meta: { requiresAuth: true } },
+                { path: 'potential', name: 'potential', component: () => import('../views/unit/gravitation/GravitationalPotential.vue'), meta: { requiresAuth: true } },
+                { path: 'satellite', name: 'satellite', component: () => import('../views/unit/gravitation/SatelliteMotion.vue'), meta: { requiresAuth: true } }
             ]
         },
         {
             path: '/freelab',
             name: 'freelab',
-            component: FreeLabIndex
+            component: FreeLabIndex,
+            meta: { requiresAuth: true }
         },
         {
             path: '/privacy-policy',
@@ -142,6 +150,36 @@ const router = createRouter({
             path: '/pyq/jee-mains/:unitId/:topicId',
             name: 'jee-mains-topic-questions',
             component: () => import('../views/pyq/JEEMainsTopicView.vue')
+        },
+        {
+            path: '/login',
+            name: 'login-selection',
+            component: () => import('../views/auth/AuthSelection.vue'),
+            meta: { guestOnly: true, hideNav: true }
+        },
+        {
+            path: '/login-form',
+            name: 'login',
+            component: () => import('../views/auth/LoginForm.vue'),
+            meta: { guestOnly: true, hideNav: true }
+        },
+        {
+            path: '/signup',
+            name: 'signup',
+            component: () => import('../views/auth/Signup.vue'),
+            meta: { guestOnly: true, hideNav: true }
+        },
+        {
+            path: '/profile',
+            name: 'profile',
+            component: () => import('../views/user/Profile.vue'),
+            meta: { requiresAuth: true, hideNav: true }
+        },
+        {
+            path: '/settings',
+            name: 'settings',
+            component: () => import('../views/user/Settings.vue'),
+            meta: { requiresAuth: true, hideNav: true }
         }
     ],
     scrollBehavior(to, from, savedPosition) {
@@ -152,6 +190,30 @@ const router = createRouter({
             }
         }
         return { top: 0 }
+    }
+})
+
+// Navigation Guards
+import { useAuthStore } from '../stores/auth'
+
+router.beforeEach((to, from, next) => {
+    const authStore = useAuthStore()
+
+    // Initialize auth state on first load
+    if (from.name === undefined) {
+        authStore.init()
+    }
+
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        next('/login')
+    } else if (to.meta.guestOnly && authStore.isAuthenticated) {
+        next('/')
+    } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+        next('/')
+    } else if (to.meta.requiresOwner && !authStore.isOwner) {
+        next('/')
+    } else {
+        next()
     }
 })
 

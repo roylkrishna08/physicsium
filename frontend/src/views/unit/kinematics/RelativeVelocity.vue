@@ -1,10 +1,10 @@
 <script setup>
 import { ref } from 'vue'
-import KinematicsNavBar from '../../../components/kinematics/KinematicsNavBar.vue'
-import RelativeVelocitySidebar from '../../../components/kinematics/RelativeVelocitySidebar.vue'
-import RelativeVelocityControls from '../../../components/kinematics/RelativeVelocityControls.vue'
+import KinematicsNavBar from '../../../components/unit/kinematics/KinematicsNavBar.vue'
+import RelativeVelocitySidebar from '../../../components/unit/kinematics/RelativeVelocitySidebar.vue'
+import RelativeVelocityControls from '../../../components/unit/kinematics/RelativeVelocityControls.vue'
 import ControlSidebar from '../../../components/ui/ControlSidebar.vue'
-import RelativeVelocityLab from '../../../components/kinematics/labs/RelativeVelocityLab.vue'
+import RelativeVelocityLab from '../../../components/unit/kinematics/labs/RelativeVelocityLab.vue'
 
 const sidebarOpen = ref(true)
 const controlsOpen = ref(true)

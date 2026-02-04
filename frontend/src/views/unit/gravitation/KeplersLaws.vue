@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import GravitationSidebar from '../../components/gravitation/GravitationSidebar.vue'
-import GravitationBackground from '../../components/gravitation/GravitationBackground.vue'
-import GravitationNavBar from '../../components/gravitation/GravitationNavBar.vue'
-import KeplerOrbitLab from '../../components/gravitation/labs/KeplerOrbitLab.vue'
+import GravitationSidebar from '../../../components/unit/gravitation/GravitationSidebar.vue'
+import GravitationBackground from '../../../components/unit/gravitation/GravitationBackground.vue'
+import GravitationNavBar from '../../../components/unit/gravitation/GravitationNavBar.vue'
+import KeplerOrbitLab from '../../../components/unit/gravitation/labs/KeplerOrbitLab.vue'
 
 const isSidebarOpen = ref(true)
 </script>
