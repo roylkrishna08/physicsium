@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
+
 const connectDB = require('./config/db');
 
 // Load env vars
@@ -33,8 +33,7 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Sanitize data
-app.use(mongoSanitize());
+
 
 // Dev logging middleware
 if (process.env.NODE_ENV === 'development') {
