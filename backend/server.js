@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
+const mongoSanitize = require('./middleware/mongoSanitize'); // Custom Express 5 compatible
 const xss = require('xss-clean');
 const hpp = require('hpp');
 
@@ -59,14 +59,8 @@ app.use(helmet({
     }
 }));
 
-// Sanitize data to prevent NoSQL injection
-// Configure for Express 5 compatibility - don't replace objects, just sanitize
-app.use(mongoSanitize({
-    replaceWith: '_',
-    onSanitize: ({ req, key }) => {
-        console.warn(`Sanitized potentially malicious input: ${key}`);
-    },
-}));
+// Sanitize data to prevent NoSQL injection (Custom Express 5 compatible middleware)
+app.use(mongoSanitize());
 
 // Prevent XSS attacks
 app.use(xss());
