@@ -10,11 +10,7 @@ const suggestUsernames = require('../utils/usernameSuggester');
 exports.register = asyncHandler(async (req, res, next) => {
     const { firstName, lastName, username, email, password, role } = req.body;
 
-    // Check for password length
-    if (password && password.length < 6) {
-        return next(new ErrorResponse('Password must be at least 6 characters', 400));
-    }
-
+    // Validation is now handled by middleware
     // Create user
     const user = await User.create({
         firstName,

@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
   title: String,
   desc: String,
   icon: String,
@@ -16,11 +18,19 @@ defineProps({
       type: Number,
       default: null
   }
-})
+});
 
 const formattedIndex = (i) => {
     return (i + 1).toString().padStart(2, '0')
-}
+};
+
+// Safely determine if icon is SVG or emoji
+const iconType = computed(() => {
+    if (!props.icon) return 'none';
+    // Icons should be emojis by default for safety
+    // If you need SVG support, pass as a component instead
+    return 'text';
+});
 </script>
 
 <template>
@@ -28,8 +38,8 @@ const formattedIndex = (i) => {
   <div v-if="!compact" class="glass-card topic-card" :style="{ '--accent': color }">
     <div v-if="index !== null" class="card-number">{{ formattedIndex(index) }}</div>
     <div class="card-header">
-        <div class="icon-box" v-if="icon.startsWith('<svg')" v-html="icon"></div>
-        <div class="icon-box" v-else>{{ icon }}</div>
+        <!-- Safe icon rendering without v-html to prevent XSS -->
+        <div class="icon-box">{{ icon }}</div>
         
         <div class="tags">
             <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
@@ -52,8 +62,8 @@ const formattedIndex = (i) => {
   <div v-else class="glass-card topic-card compact" :style="{ '--accent': color }">
       <div v-if="index !== null" class="card-number compact-num">{{ formattedIndex(index) }}</div>
       
-      <div class="icon-box sm" v-if="icon.startsWith('<svg')" v-html="icon"></div>
-      <div class="icon-box sm" v-else>{{ icon }}</div>
+      <!-- Safe icon rendering without v-html to prevent XSS -->
+      <div class="icon-box sm">{{ icon }}</div>
       
       <h3 class="title sm">{{ title }}</h3>
   </div>
