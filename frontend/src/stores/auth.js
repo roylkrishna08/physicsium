@@ -2,8 +2,9 @@ import { defineStore } from 'pinia';
 import axios from 'axios';
 
 // Create an axios instance with base URL
+// Create an axios instance with base URL
 const api = axios.create({
-    baseURL: '/api', // This assumes a proxy is set up in vite.config.js or the full URL is used
+    baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 // Set default baseURL if not using proxy
