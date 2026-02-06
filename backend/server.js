@@ -60,7 +60,13 @@ app.use(helmet({
 }));
 
 // Sanitize data to prevent NoSQL injection
-app.use(mongoSanitize());
+// Configure for Express 5 compatibility - don't replace objects, just sanitize
+app.use(mongoSanitize({
+    replaceWith: '_',
+    onSanitize: ({ req, key }) => {
+        console.warn(`Sanitized potentially malicious input: ${key}`);
+    },
+}));
 
 // Prevent XSS attacks
 app.use(xss());
