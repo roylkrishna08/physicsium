@@ -26,12 +26,17 @@ const corsOptions = {
         if (!origin) return callback(null, true);
 
         const allowedOrigins = process.env.CLIENT_URL
-            ? process.env.CLIENT_URL.split(',').map(url => url.trim())
+            ? process.env.CLIENT_URL.split(',').map(url => url.trim().replace(/\/$/, ''))
             : ['http://localhost:5173', 'http://localhost:3000'];
 
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        // Clean the incoming origin to remove trailing slash for comparison
+        const cleanOrigin = origin.replace(/\/$/, '');
+
+        if (allowedOrigins.indexOf(cleanOrigin) !== -1) {
             callback(null, true);
         } else {
+            console.error(`CORS Blocked! Incoming origin: "${origin}"`);
+            console.error(`Allowed Origins whitelist: ${JSON.stringify(allowedOrigins)}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
