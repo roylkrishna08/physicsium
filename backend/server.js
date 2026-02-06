@@ -6,7 +6,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('./middleware/mongoSanitize'); // Custom Express 5 compatible
-const xss = require('xss-clean');
+const xss = require('./middleware/xssClean'); // Custom Express 5 compatible
 const hpp = require('hpp');
 
 const connectDB = require('./config/db');
