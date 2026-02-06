@@ -4,7 +4,6 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const helmet = require('helmet');
-const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const connectDB = require('./config/db');
@@ -29,9 +28,6 @@ app.use(cors({
 
 // Set security headers
 app.use(helmet());
-
-// Prevent XSS attacks
-app.use(xss());
 
 // Rate limiting
 const limiter = rateLimit({
