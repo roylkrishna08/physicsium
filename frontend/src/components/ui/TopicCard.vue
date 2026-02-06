@@ -27,8 +27,7 @@ const formattedIndex = (i) => {
 // Safely determine if icon is SVG or emoji
 const iconType = computed(() => {
     if (!props.icon) return 'none';
-    // Icons should be emojis by default for safety
-    // If you need SVG support, pass as a component instead
+    if (props.icon.trim().startsWith('<svg')) return 'svg';
     return 'text';
 });
 </script>
@@ -38,8 +37,11 @@ const iconType = computed(() => {
   <div v-if="!compact" class="glass-card topic-card" :style="{ '--accent': color }">
     <div v-if="index !== null" class="card-number">{{ formattedIndex(index) }}</div>
     <div class="card-header">
-        <!-- Safe icon rendering without v-html to prevent XSS -->
-        <div class="icon-box">{{ icon }}</div>
+        <!-- Safe icon rendering -->
+        <div class="icon-box">
+            <span v-if="iconType === 'text'">{{ icon }}</span>
+            <div v-else-if="iconType === 'svg'" v-html="icon" class="svg-icon-wrapper"></div>
+        </div>
         
         <div class="tags">
             <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
@@ -62,8 +64,11 @@ const iconType = computed(() => {
   <div v-else class="glass-card topic-card compact" :style="{ '--accent': color }">
       <div v-if="index !== null" class="card-number compact-num">{{ formattedIndex(index) }}</div>
       
-      <!-- Safe icon rendering without v-html to prevent XSS -->
-      <div class="icon-box sm">{{ icon }}</div>
+      <!-- Safe icon rendering -->
+      <div class="icon-box sm">
+          <span v-if="iconType === 'text'">{{ icon }}</span>
+          <div v-else-if="iconType === 'svg'" v-html="icon" class="svg-icon-wrapper sm"></div>
+      </div>
       
       <h3 class="title sm">{{ title }}</h3>
   </div>
@@ -377,5 +382,25 @@ const iconType = computed(() => {
         color: rgba(255, 255, 255, 0.2); /* Brighter */
         text-shadow: 0 0 10px rgba(0,0,0,0.5); /* Pop against background */
     }
+}
+
+.svg-icon-wrapper {
+    width: 60%;
+    height: 60%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+}
+
+.svg-icon-wrapper.sm {
+    width: 70%;
+    height: 70%;
+}
+
+/* Ensure inner SVG fills the wrapper */
+:deep(.svg-icon-wrapper svg) {
+    width: 100%;
+    height: 100%;
 }
 </style>

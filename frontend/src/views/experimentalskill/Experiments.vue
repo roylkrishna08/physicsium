@@ -116,8 +116,6 @@ const getColor = (index) => {
       </div>
       <h1 class="text-gradient">Experimental Skills</h1>
       <p class="subtitle">Practical applications and laboratory techniques</p>
-      
-      <p class="subtitle">Practical applications and laboratory techniques</p>
     </header>
 
     <div class="experiments-grid">
