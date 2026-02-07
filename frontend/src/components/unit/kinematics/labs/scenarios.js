@@ -27,7 +27,15 @@ export const scenarios = {
                 }
             })
         },
-        getStats: (objects, props, minDistance) => []
+        getStats: (objects, props, minDistance) => {
+            const a = objects.value.find(o => o.id === 'A')
+            const b = objects.value.find(o => o.id === 'B')
+            if (!a || !b) return []
+            return [
+                { label: 'Rel Velocity (B rel A)', value: (b.vx - a.vx).toFixed(1) + ' m/s' },
+                { label: 'Distance', value: Math.abs(b.x - a.x).toFixed(1) + ' m' }
+            ]
+        }
     },
 
     'river': {
@@ -38,22 +46,90 @@ export const scenarios = {
                 {
                     id: 'Boat',
                     x: cx,
-                    y: cy + 150,
+                    y: cy + 300, // Bottom Bank
                     vx: props.v1 * Math.cos(angleRad),
                     vy: -props.v1 * Math.sin(angleRad),
                     color: '#00ff9d',
                     label: 'Boat',
-                    type: 'boat'
+                    type: 'boat',
+                    path: [] // Initialize path for tracing
                 },
-                { id: 'B', x: cx, y: cy + 150, vx: props.v2, vy: 0, color: '#ff0055', label: 'B', type: 'ball' }
+                { id: 'B', x: cx, y: cy + 300, vx: props.v2, vy: 0, color: '#ff0055', label: 'B', type: 'ball' }
             ]
         },
         update: (objects, dt, props) => {
             const boat = objects.value[0]
             const ref = objects.value[1]
             if (boat) {
-                boat.x += (boat.vx + props.v2) * dt
-                boat.y += boat.vy * dt
+                // Refresh velocity from props to allow steering after collision or while paused
+                const angleRad = (props.angle1 * Math.PI) / 180
+                boat.vx = props.v1 * Math.cos(angleRad)
+                boat.vy = -props.v1 * Math.sin(angleRad)
+
+                const targetY = boat.y + boat.vy * dt
+                const upperBank = -50
+                const lowerBank = 350
+
+                // Track Bank Arrival
+                boat.atUpperBank = boat.y <= upperBank
+                boat.atLowerBank = boat.y >= lowerBank
+
+                // Allow movement only if it stays within banks or is moving back into the river
+                if (boat.atUpperBank && boat.vy < 0) {
+                    // At upper bank and trying to go further.
+                    const finalStopY = upperBank - 30 // Where swimmer will finally stop on the grass
+
+                    if (props.visualTheme === 'swimmer') {
+                        // Swimmer: allow walking onto the grass
+                        if (boat.y > finalStopY) {
+                            boat.y += boat.vy * dt
+                            boat.x += props.v2 * dt // Still drifting while walking onto shore
+                        } else {
+                            // Fully on the grass - STOP ALL MOVEMENT
+                            boat.vy = 0
+                            boat.vx = 0
+                            boat.y = finalStopY
+                            // x stays the same - no drift, celebrating in place
+                        }
+                    } else {
+                        // Boat: stop at water's edge
+                        boat.vy = 0
+                        boat.y = Math.min(boat.y, upperBank)
+                        boat.x += props.v2 * dt // Boat drifts with current
+                    }
+                } else if (boat.atLowerBank && boat.vy > 0) {
+                    // At lower bank and trying to go further.
+                    const finalStopY = lowerBank + 30 // Where swimmer will finally stop on the grass
+
+                    if (props.visualTheme === 'swimmer') {
+                        // Swimmer: allow walking onto the grass
+                        if (boat.y < finalStopY) {
+                            boat.y += boat.vy * dt
+                            boat.x += props.v2 * dt // Still drifting while walking onto shore
+                        } else {
+                            // Fully on the grass - STOP ALL MOVEMENT
+                            boat.vy = 0
+                            boat.vx = 0
+                            boat.y = finalStopY
+                            // x stays the same - no drift, celebrating in place
+                        }
+                    } else {
+                        // Boat: stop at water's edge
+                        boat.vy = 0
+                        boat.y = Math.max(boat.y, lowerBank)
+                        boat.x += props.v2 * dt // Boat drifts with current
+                    }
+                } else {
+                    boat.x += (boat.vx + props.v2) * dt
+                    boat.y += boat.vy * dt
+                }
+
+                // Track path every few frames
+                if (!boat.path) boat.path = []
+                if (boat.path.length === 0 || Math.hypot(boat.x - boat.path[boat.path.length - 1].x, boat.y - boat.path[boat.path.length - 1].y) > 5) {
+                    boat.path.push({ x: boat.x, y: boat.y })
+                    if (boat.path.length > 500) boat.path.shift()
+                }
             }
             if (ref) {
                 ref.x += props.v2 * dt
@@ -61,9 +137,47 @@ export const scenarios = {
         },
         draw: (ctx, canvas, objects, props, utils) => {
             utils.drawRiver(ctx, canvas)
+
+            // Draw Clipped Grid over the river
+            if (props.showGrid) {
+                ctx.save()
+                ctx.beginPath()
+                ctx.rect(-5000, -50, 10000, 400) // River area: yStart=-50, height=400
+                ctx.clip()
+                utils.drawGrid(ctx, canvas)
+                ctx.restore()
+            }
+
             objects.value.forEach(obj => {
                 if (obj.type === 'boat') {
-                    utils.drawBoat(ctx, obj.x, obj.y, obj.color, obj.label)
+                    // Path Tracing
+                    if (obj.path && obj.path.length > 1) {
+                        ctx.save()
+                        ctx.beginPath()
+                        ctx.strokeStyle = '#00ff9d' // Full opacity
+                        ctx.lineWidth = 3
+                        ctx.lineJoin = 'round'
+                        ctx.lineCap = 'round'
+                        ctx.setLineDash([8, 6])
+
+                        // Glow effect
+                        ctx.shadowBlur = 8
+                        ctx.shadowColor = '#00ff9d'
+
+                        ctx.moveTo(obj.path[0].x, obj.path[0].y)
+                        for (let i = 1; i < obj.path.length; i++) {
+                            ctx.lineTo(obj.path[i].x, obj.path[i].y)
+                        }
+                        ctx.stroke()
+                        ctx.restore()
+                    }
+
+
+                    if (props.visualTheme === 'swimmer') {
+                        utils.drawSwimmer(ctx, obj.x, obj.y, obj.color, 'Swimmer', obj.atUpperBank || obj.atLowerBank)
+                    } else {
+                        utils.drawBoat(ctx, obj.x, obj.y, obj.color, obj.label)
+                    }
                 } else {
                     utils.drawObj(ctx, obj.x, obj.y, obj.color, obj.label, obj.type)
                 }
@@ -71,9 +185,24 @@ export const scenarios = {
         },
         getStats: (objects, props, minDistance) => {
             const boat = objects.value[0]
-            return boat ? [
-                { label: 'Rel Velocity X', value: (boat.vx).toFixed(1) + ' m/s' }
-            ] : []
+            if (!boat) return []
+
+            const riverWidth = 350 // (cy+300) to (yStart=-50)
+            const crossingTime = Math.abs(boat.vy) > 0.1 ? (riverWidth / Math.abs(boat.vy)) : Infinity
+            const drift = (boat.vx + props.v2) * (crossingTime === Infinity ? 0 : crossingTime)
+
+            const vgx = boat.vx + props.v2
+            const vgy = boat.vy
+            const groundSpeed = Math.sqrt(vgx * vgx + vgy * vgy)
+
+            const labelPrefix = props.visualTheme === 'swimmer' ? 'Swimmer' : 'Boat'
+
+            return [
+                { label: `${labelPrefix} Speed rel. Water`, value: props.v1.toFixed(1) + ' m/s' },
+                { label: `${labelPrefix} Ground Speed`, value: groundSpeed.toFixed(1) + ' m/s' },
+                { label: 'Crossing Time', value: crossingTime === Infinity ? '∞' : crossingTime.toFixed(1) + ' s' },
+                { label: 'Drift Distance', value: drift.toFixed(1) + ' m' }
+            ]
         }
     },
 
@@ -129,7 +258,28 @@ export const scenarios = {
                 }
             })
         },
-        getStats: (objects, props, minDistance) => []
+        getStats: (objects, props, minDistance) => {
+            const plane = objects.value[0]
+            const wind = objects.value[1]
+            if (!plane || !wind) return []
+
+            // Ground velocity V_g = V_p + V_w
+            const vgx = plane.vx + wind.vx
+            const vgy = plane.vy + wind.vy
+            const groundSpeed = Math.sqrt(vgx * vgx + vgy * vgy)
+
+            // Drift angle: angle of V_g vs V_p
+            const planeAngle = Math.atan2(-plane.vy, plane.vx)
+            const groundAngle = Math.atan2(-vgy, vgx)
+            let driftAngle = (groundAngle - planeAngle) * 180 / Math.PI
+            if (driftAngle > 180) driftAngle -= 360
+            if (driftAngle < -180) driftAngle += 360
+
+            return [
+                { label: 'Ground Speed', value: groundSpeed.toFixed(1) + ' m/s' },
+                { label: 'Drift Angle', value: driftAngle.toFixed(1) + '°' }
+            ]
+        }
     },
 
     'rain': {
@@ -295,17 +445,15 @@ export const scenarios = {
             const man = objects.value[0]
             if (!man) return []
 
-            // Relative Velocity: Vrm = Vr - Vm
-            // Vr = (v2, 10)
-            // Vm = (v1, 0) => Vrm_x = v2 - v1, Vrm_y = 10
             const v_rel_x = props.v2 - props.v1
-            const v_rel_y = 10
+            const v_rel_y = props.rainSpeed
+            const v_rel_mag = Math.sqrt(v_rel_x * v_rel_x + v_rel_y * v_rel_y)
+            const optimalAngle = Math.atan2(props.v1 - props.v2, props.rainSpeed) * 180 / Math.PI
 
-            // Umbrella blocks rain from relative direction
-            // Angle is relative to vertical (Y axis)
-            const umbrellaAngle = Math.atan2(v_rel_x, v_rel_y) * 180 / Math.PI
-
-            return []
+            return [
+                { label: 'v_RM (Mag)', value: v_rel_mag.toFixed(1) + ' m/s' },
+                { label: 'Optimal θ', value: optimalAngle.toFixed(1) + '°' }
+            ]
         }
     },
 
@@ -335,7 +483,24 @@ export const scenarios = {
             const man = objects.value[0]
             if (man) utils.drawManWithFlag(ctx, man.x, man.y)
         },
-        getStats: (objects, props, minDistance) => []
+        getStats: (objects, props, minDistance) => {
+            const man = objects.value[0]
+            if (!man) return []
+
+            const a2 = (props.angle2 * Math.PI) / 180
+            const vwx = props.v2 * Math.cos(a2)
+            const vwy = props.v2 * Math.sin(a2)
+            const v_rel_x = vwx - props.v1
+            const v_rel_y = vwy
+
+            const flagAngle = Math.atan2(v_rel_y, v_rel_x) * 180 / Math.PI
+            const relSpeed = Math.sqrt(v_rel_x * v_rel_x + v_rel_y * v_rel_y)
+
+            return [
+                { label: 'Rel Wind Speed', value: relSpeed.toFixed(1) + ' m/s' },
+                { label: 'Flag Angle', value: flagAngle.toFixed(1) + '°' }
+            ]
+        }
     },
 
     'angular-velocity': {
@@ -368,7 +533,28 @@ export const scenarios = {
                 utils.drawAngular(ctx, objects.value[0], objects.value[1])
             }
         },
-        getStats: (objects, props, minDistance) => []
+        getStats: (objects, props, minDistance) => {
+            if (objects.value.length < 2) return []
+            const a = objects.value[0]
+            const b = objects.value[1]
+
+            const r = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2)
+            const v_rel_x = b.vx - a.vx
+            const v_rel_y = b.vy - a.vy
+
+            const dx = b.x - a.x
+            const dy = b.y - a.y
+            const perp_r_x = -dy / r
+            const perp_r_y = dx / r
+
+            const v_perp = v_rel_x * perp_r_x + v_rel_y * perp_r_y
+            const omega = v_perp / r
+
+            return [
+                { label: 'Relative Dist', value: (r / 10).toFixed(1) + ' m' },
+                { label: 'Angular Vel (ω)', value: omega.toFixed(3) + ' rad/s' }
+            ]
+        }
     },
 
     'min-distance': {

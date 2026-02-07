@@ -5,6 +5,8 @@ import RelativeVelocitySidebar from '../../../components/unit/kinematics/Relativ
 import RelativeVelocityControls from '../../../components/unit/kinematics/RelativeVelocityControls.vue'
 import ControlSidebar from '../../../components/ui/ControlSidebar.vue'
 import RelativeVelocityLab from '../../../components/unit/kinematics/labs/RelativeVelocityLab.vue'
+import DrawingCanvas from '../../../components/drawingTool/DrawingCanvas.vue'
+import DrawingSidebar from '../../../components/drawingTool/DrawingSidebar.vue'
 
 const sidebarOpen = ref(true)
 const controlsOpen = ref(true)
@@ -27,6 +29,32 @@ const manualUmbrella = ref(false)
 const umbrellaAngle = ref(0)
 const showTheta = ref(true) // New state for Theta Calculation visibility
 const labRef = ref(null)
+const drawingCanvasRef = ref(null)
+
+// Drawing Tool State
+const drawingActive = ref(false)
+const drawingSidebarOpen = ref(false)
+const drawingMode = ref('pen')
+const drawingColor = ref('#00ff9d') // Match Kinematics theme
+const drawingThickness = ref(3)
+const isShapeSelected = ref(false)
+
+const toggleDrawing = () => {
+  drawingActive.value = !drawingActive.value
+  drawingSidebarOpen.value = drawingActive.value
+}
+
+const handleClearDrawing = () => {
+  if (drawingCanvasRef.value) {
+    drawingCanvasRef.value.clearAll()
+  }
+}
+
+const handleDeleteSelected = () => {
+  if (drawingCanvasRef.value) {
+    drawingCanvasRef.value.deleteSelectedShape()
+  }
+}
 
 const scenarios = [
   { id: '1d', label: '1D Pursuit', description: 'Overtaking and head-on meeting problems on a straight line.' },
@@ -62,8 +90,10 @@ const handleAddBall = () => {
       experiment-name="Relative Velocity Lab"
       @toggleLeftSidebar="sidebarOpen = !sidebarOpen"
       @toggleRightSidebar="controlsOpen = !controlsOpen"
+      @toggleDrawing="toggleDrawing"
       :is-left-sidebar-collapsed="!sidebarOpen"
       :is-right-sidebar-collapsed="!controlsOpen"
+      :drawing-active="drawingActive"
     />
 
     <RelativeVelocitySidebar 
@@ -121,6 +151,26 @@ const handleAddBall = () => {
         v-model:zoom="zoom"
       />
     </main>
+
+    <!-- Drawing Tool Components -->
+    <DrawingCanvas 
+      ref="drawingCanvasRef"
+      :active="drawingActive"
+      :mode="drawingMode"
+      :color="drawingColor"
+      :thickness="drawingThickness"
+      @selectionChanged="isShapeSelected = $event"
+    />
+
+    <DrawingSidebar 
+      v-model:isOpen="drawingSidebarOpen"
+      v-model:activeMode="drawingMode"
+      v-model:activeColor="drawingColor"
+      v-model:activeThickness="drawingThickness"
+      :is-shape-selected="isShapeSelected"
+      @clearAll="handleClearDrawing"
+      @deleteSelected="handleDeleteSelected"
+    />
   </div>
 </template>
 

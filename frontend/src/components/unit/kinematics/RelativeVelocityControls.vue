@@ -84,57 +84,93 @@ const deleteObject = () => {
       </div>
     </div>
 
-    <div class="control-group" v-if="mode !== 'rain'">
+    <div class="control-group" v-if="mode === 'river' || ['1d', 'angular-velocity', 'min-distance'].includes(mode)">
       <div class="theme-selector">
-        <button 
-          class="frame-btn"
-          :class="{ active: visualTheme === 'ball' }"
-          @click="emit('update:visualTheme', 'ball')"
-        >
-          Minimal (Balls)
-        </button>
-        <button 
-          class="frame-btn"
-          :class="{ active: visualTheme === 'car' }"
-          @click="emit('update:visualTheme', 'car')"
-        >
-          Realistic (Cars)
-        </button>
+        <!-- River Mode Specific Themes -->
+        <template v-if="mode === 'river'">
+          <button 
+            class="frame-btn"
+            :class="{ active: visualTheme === 'boat' }"
+            @click="emit('update:visualTheme', 'boat')"
+          >
+            Motor Boat
+          </button>
+          <button 
+            class="frame-btn"
+            :class="{ active: visualTheme === 'swimmer' }"
+            @click="emit('update:visualTheme', 'swimmer')"
+          >
+            Swimmer (Woman)
+          </button>
+        </template>
+
+        <!-- General Themes -->
+        <template v-else>
+          <button 
+            class="frame-btn"
+            :class="{ active: visualTheme === 'ball' }"
+            @click="emit('update:visualTheme', 'ball')"
+          >
+            Minimal (Ball)
+          </button>
+          <button 
+            class="frame-btn"
+            :class="{ active: visualTheme === 'car' }"
+            @click="emit('update:visualTheme', 'car')"
+          >
+            Realistic (Cars)
+          </button>
+        </template>
       </div>
     </div>
 
-    <!-- Rain-specific velocity controls -->
-    <div class="control-group" v-if="mode === 'rain'">
+    <!-- Dynamic Velocity Controls (Common for most scenarios) -->
+    <div class="control-group" v-if="mode !== '1d'">
         <div class="slider-item">
             <div class="slider-header">
-                <span class="label">Man Speed (V<sub>m</sub>)</span>
+                <span class="label">
+                    {{ 
+                        mode === 'rain' || mode === 'flag-flutter' ? 'Man Speed (v₁)' : 
+                        mode === 'river' ? (visualTheme === 'swimmer' ? 'Swimmer Speed (v₁)' : 'Boat Speed (v₁)') : 
+                        mode === 'aeroplane' ? 'Air Speed (v₁)' : 'Speed A (v₁)'
+                    }}
+                </span>
                 <input type="number" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="0" :max="15" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="0" :max="20" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="range-slider">
         </div>
 
         <div class="slider-item">
             <div class="slider-header">
-                <span class="label">Wind Speed (V<sub>r,x</sub>)</span>
+                <span class="label">
+                    {{ 
+                        mode === 'rain' || mode === 'flag-flutter' || mode === 'aeroplane' ? 'Wind Speed (v₂)' : 
+                        mode === 'river' ? 'River Speed (v₂)' : 'Speed B (v₂)'
+                    }}
+                </span>
                 <input type="number" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="-15" :max="15" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
-            <div class="slider-labels" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">
+            <input type="range" :min="mode === 'rain' ? -15 : 0" :max="20" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
+            <div class="slider-labels" v-if="mode === 'rain'" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">
                 <span>&lt; Left</span>
                 <span>0</span>
                 <span>Right &gt;</span>
             </div>
         </div>
 
-        <div class="slider-item">
+        <!-- Rain-specific vertical speed -->
+        <div class="slider-item" v-if="mode === 'rain'">
             <div class="slider-header">
-                 <span class="label">Rain Speed (V<sub>r,y</sub>)</span>
+                 <span class="label">Rain Vertical Speed</span>
                  <input type="number" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="5" :max="25" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="range-slider">
         </div>
-        
-        <div class="control-group-inner" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; margin-top: 1rem;">
+    </div>
+
+    <!-- Rain-specific Umbrella controls -->
+    <div class="control-group" v-if="mode === 'rain'">
+        <div class="control-group-inner">
             <label class="toggle-item" style="margin-bottom: 1rem;">
                 <input type="checkbox" :checked="manualUmbrella" @change="emit('update:manualUmbrella', $event.target.checked)">
                 <span class="toggle-label">Manual Umbrella Control</span>
@@ -156,13 +192,32 @@ const deleteObject = () => {
     <div class="control-group" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter'].includes(mode)">
         <div class="slider-item" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance'].includes(mode)">
             <div class="slider-header">
-                <span class="label">{{ mode === 'river' ? 'Boat Angle' : 'Angle A' }}</span>
+                <span class="label">{{ mode === 'river' ? (visualTheme === 'swimmer' ? 'Swimmer Direction' : 'Boat Heading Angle') : 'Angle A' }}</span>
                 <input type="number" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="number-input small">
             </div>
             <input type="range" :min="0" :max="360" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="range-slider">
+            
+            <!-- Quick-Set JEE Options for River Boat -->
+            <div class="quick-presets" v-if="mode === 'river'" style="display: flex; gap: 8px; margin-top: 10px;">
+                <button class="preset-btn small" @click="emit('update:angle1', 90)" title="Shortest Time to Cross">
+                    Shortest Time
+                </button>
+                <button 
+                    class="preset-btn small" 
+                    @click="() => {
+                        const sinTheta = Math.min(1, props.v2 / props.v1);
+                        const theta = Math.asin(sinTheta) * 180 / Math.PI;
+                        emit('update:angle1', 90 + theta);
+                    }"
+                    :disabled="v2 > v1"
+                    :title="v2 > v1 ? 'Impossible (River too fast)' : 'Shortest Path / Zero Drift'"
+                >
+                    Shortest Path
+                </button>
+            </div>
         </div>
 
-        <div class="slider-item" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance', 'flag-flutter'].includes(mode)">
+        <div class="slider-item" v-if="['aeroplane', 'angular-velocity', 'flag-flutter'].includes(mode)">
             <div class="slider-header">
                 <span class="label">{{ mode === 'flag-flutter' ? 'Wind Angle' : 'Angle B' }}</span>
                 <input type="number" step="1" :value="angle2" @input="emit('update:angle2', parseFloat($event.target.value))" class="number-input small">
@@ -291,6 +346,28 @@ const deleteObject = () => {
 
 .label { color: var(--text-secondary); }
 .value { color: var(--primary-glow); font-family: monospace; }
+
+.preset-btn.small {
+    flex: 1;
+    padding: 6px 4px;
+    font-size: 0.7rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.preset-btn.small:hover:not(:disabled) {
+    background: var(--primary-glow);
+    color: #000;
+}
+
+.preset-btn.small:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
 
 .number-input {
     background: rgba(0, 0, 0, 0.4);

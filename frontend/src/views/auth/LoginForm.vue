@@ -7,7 +7,7 @@ import UniverseBg from '../../components/backgrounds/UniverseBg.vue';
 const authStore = useAuthStore();
 const router = useRouter();
 
-const email = ref('');
+const identifier = ref('');
 const password = ref('');
 const showPassword = ref(false);
 const error = ref('');
@@ -19,7 +19,7 @@ const handleLogin = async () => {
     
     try {
         await authStore.login({
-            email: email.value,
+            identifier: identifier.value,
             password: password.value,
         });
         router.push('/');
@@ -72,7 +72,7 @@ const handleLogin = async () => {
                 <!-- Form -->
                 <form @submit.prevent="handleLogin" class="auth-form">
                     <div class="form-group">
-                        <label for="email">Email Address</label>
+                        <label for="identifier">Email or Username</label>
                         <div class="input-wrapper">
                             <div class="input-glow"></div>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -80,12 +80,12 @@ const handleLogin = async () => {
                                 <polyline points="22,6 12,13 2,6"></polyline>
                             </svg>
                             <input
-                                id="email"
-                                v-model="email"
-                                type="email"
-                                placeholder="your.email@example.com"
+                                id="identifier"
+                                v-model="identifier"
+                                type="text"
+                                placeholder="Email or Username"
                                 required
-                                autocomplete="email"
+                                autocomplete="username"
                             />
                         </div>
                     </div>

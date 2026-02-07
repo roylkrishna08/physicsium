@@ -18,7 +18,8 @@ const props = defineProps({
   // Rain Props
   rainSpeed: { type: Number, default: 10 }, 
   manualUmbrella: { type: Boolean, default: false },
-  umbrellaAngle: { type: Number, default: 0 }
+  umbrellaAngle: { type: Number, default: 0 },
+  showTheta: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['update:zoom', 'update:objects', 'update:selectedObjectId'])
@@ -118,43 +119,52 @@ const handleMouseDown = (e) => {
         }
     }
 
-    if (props.mode === 'rain' && props.showVectors) {
-        // --- Diagram 1 (Originals) ---
+    if (['rain', 'river'].includes(props.mode) && props.showVectors) {
+        // --- Diagram 1 (Originals / River Addition) ---
         const v1 = vectorPos.value
-        // Resize Zone (Bottom Right Corner 20x20)
-        const size1 = 150 * v1.scale
-        if (mx >= v1.x + size1 - 20 && mx <= v1.x + size1 + 10 &&
-            my >= v1.y + size1 - 20 && my <= v1.y + size1 + 10) {
+        
+        const isRiver = props.mode === 'river'
+        const size1 = (isRiver ? 180 : 150) * v1.scale
+        const boxX = isRiver ? v1.x - 70 : v1.x - 10
+        const boxY = isRiver ? v1.y - 15 : v1.y - 10
+        const boxW = isRiver ? size1 + 110 : size1 + 20
+        const boxH = isRiver ? size1 + 110 : size1 + 20
+
+        // Resize Zone (Bottom Right Corner)
+        if (mx >= boxX + boxW - 25 && mx <= boxX + boxW + 5 &&
+            my >= boxY + boxH - 25 && my <= boxY + boxH + 5) {
             draggedObj.value = 'vector-resize'
             isDragging.value = true
             lastMousePos.value = { x: mx, y: my }
             return
         }
         // Drag Zone
-        if (mx >= v1.x - 20 && mx <= v1.x + size1 &&
-            my >= v1.y - 20 && my <= v1.y + size1) {
+        if (mx >= boxX && mx <= boxX + boxW &&
+            my >= boxY && my <= boxY + boxH) {
             draggedObj.value = 'vector'
             isDragging.value = true
             lastMousePos.value = { x: mx, y: my }
             return
         }
         
-        // --- Diagram 2 (Resultant) ---
-        const v2 = vectorPos2.value
-        const size2 = 150 * v2.scale
-        if (mx >= v2.x + size2 - 20 && mx <= v2.x + size2 + 10 &&
-            my >= v2.y + size2 - 20 && my <= v2.y + size2 + 10) {
-            draggedObj.value = 'vector2-resize'
-            isDragging.value = true
-            lastMousePos.value = { x: mx, y: my }
-            return
-        }
-        if (mx >= v2.x - 20 && mx <= v2.x + size2 &&
-            my >= v2.y - 20 && my <= v2.y + size2) {
-            draggedObj.value = 'vector2'
-            isDragging.value = true
-            lastMousePos.value = { x: mx, y: my }
-            return
+        // --- Diagram 2 (Resultant - Rain Only) ---
+        if (props.mode === 'rain') {
+            const v2 = vectorPos2.value
+            const size2 = 150 * v2.scale
+            if (mx >= v2.x + size2 - 20 && mx <= v2.x + size2 + 10 &&
+                my >= v2.y + size2 - 20 && my <= v2.y + size2 + 10) {
+                draggedObj.value = 'vector2-resize'
+                isDragging.value = true
+                lastMousePos.value = { x: mx, y: my }
+                return
+            }
+            if (mx >= v2.x - 20 && mx <= v2.x + size2 &&
+                my >= v2.y - 20 && my <= v2.y + size2) {
+                draggedObj.value = 'vector2'
+                isDragging.value = true
+                lastMousePos.value = { x: mx, y: my }
+                return
+            }
         }
     }
 
@@ -203,6 +213,7 @@ const handleMouseMove = (e) => {
             obj.x = simPos.x
             obj.y = simPos.y
             if (trails.value[obj.id]) trails.value[obj.id] = []
+            if (obj.path) obj.path = [] // Clear scenario-specific path (e.g. river boat)
         }
     }
     
@@ -336,8 +347,8 @@ const draw = () => {
   // 3. Move to focal point in sim space
   ctx.translate(-focal.x, -focal.y)
 
-  // Draw Grid
-  if (props.showGrid) {
+  // Draw Grid (Global background grid - disabled for river to use clipped river-only grid)
+  if (props.showGrid && props.mode !== 'river') {
       drawGrid(ctx, canvas)
   }
 
@@ -365,7 +376,8 @@ const draw = () => {
   const utils = {
     drawObj, drawCar, drawRoad, drawRiver, drawMan, drawRain, 
     drawVector, drawSky, drawManWithFlag, drawAngular,
-    drawBoat, drawPlane, drawRainSource, drawRainVectorDiagram, time
+    drawBoat, drawSwimmer, drawPlane, drawRainSource, drawRainVectorDiagram, 
+    drawGrid, time
   }
 
   // Delegate drawing to the active scenario
@@ -392,39 +404,91 @@ const draw = () => {
   // Draw Screen-Space UI Elements (Vector Diagram)
   if (props.mode === 'rain' && props.showVectors) {
       const v1 = vectorPos.value
-      // Draw Diagram 1 (Originals)
+      const size1 = 150 * v1.scale
+      const v2 = vectorPos2.value
+      const size2 = 150 * v2.scale
+
+      // Panel 1
+      ctx.save()
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.92)'
+      ctx.beginPath()
+      if (ctx.roundRect) ctx.roundRect(v1.x - 10, v1.y - 10, size1 + 20, size1 + 20, 10)
+      else ctx.rect(v1.x - 10, v1.y - 10, size1 + 20, size1 + 20)
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
+      
       drawRainVectorDiagram(ctx, v1.x, v1.y, v1.scale)
       
-      // Border & Resize Handle 1
-      const size1 = 150 * v1.scale
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(v1.x - 10, v1.y - 10, size1 + 20, size1 + 20)
-      
-      // Resize Handle Triangle (Bottom Right)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      // Resize Handle 1
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
       ctx.beginPath()
       ctx.moveTo(v1.x + size1 + 10, v1.y + size1 + 10)
-      ctx.lineTo(v1.x + size1 + 10, v1.y + size1 - 5)
-      ctx.lineTo(v1.x + size1 - 5, v1.y + size1 + 10)
+      ctx.lineTo(v1.x + size1 + 10, v1.y + size1 - 2)
+      ctx.lineTo(v1.x + size1 - 2, v1.y + size1 + 10)
       ctx.fill()
       
-      // Draw Diagram 2 (Resultant)
-      const v2 = vectorPos2.value
+      // Panel 2
+      ctx.save()
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.92)'
+      ctx.beginPath()
+      if (ctx.roundRect) ctx.roundRect(v2.x - 10, v2.y - 10, size2 + 20, size2 + 20, 10)
+      else ctx.rect(v2.x - 10, v2.y - 10, size2 + 20, size2 + 20)
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
+      
       drawRainComponentDiagram(ctx, v2.x, v2.y, v2.scale)
       
-      // Border & Resize Handle 2
-      const size2 = 150 * v2.scale
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(v2.x - 10, v2.y - 10, size2 + 20, size2 + 20)
-      
-      // Resize Handle Triangle 2
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      // Resize Handle 2
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
       ctx.beginPath()
       ctx.moveTo(v2.x + size2 + 10, v2.y + size2 + 10)
-      ctx.lineTo(v2.x + size2 + 10, v2.y + size2 - 5)
-      ctx.lineTo(v2.x + size2 - 5, v2.y + size2 + 10)
+      ctx.lineTo(v2.x + size2 + 10, v2.y + size2 - 2)
+      ctx.lineTo(v2.x + size2 - 2, v2.y + size2 + 10)
+      ctx.fill()
+  }
+
+  // Draw River Vector Diagram (Screen-Space)
+  if (props.mode === 'river' && props.showVectors) {
+      const v = vectorPos.value
+      const size = 180 * v.scale
+      const boxX = v.x - 70
+      const boxY = v.y - 15
+      const boxW = size + 110
+      const boxH = size + 110
+
+      // High Contrast Glass Panel
+      ctx.save()
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.92)' // Ultra dark slate
+      ctx.shadowBlur = 15
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+      ctx.beginPath()
+      if (ctx.roundRect) {
+          ctx.roundRect(boxX, boxY, boxW, boxH, 12)
+      } else {
+          ctx.rect(boxX, boxY, boxW, boxH)
+      }
+      ctx.fill()
+      
+      // Glass Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
+
+      drawRiverVectorDiagram(ctx, v.x, v.y, v.scale)
+      
+      // Resize Handle Triangle
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+      ctx.beginPath()
+      ctx.moveTo(boxX + boxW, boxY + boxH)
+      ctx.lineTo(boxX + boxW, boxY + boxH - 12)
+      ctx.lineTo(boxX + boxW - 12, boxY + boxH)
       ctx.fill()
   }
   
@@ -438,7 +502,7 @@ const drawGrid = (ctx, canvas) => {
     
     // Minor Grid Lines (Every 25px)
     ctx.beginPath()
-    ctx.strokeStyle = 'rgba(0, 212, 255, 0.03)'
+    ctx.strokeStyle = 'rgba(0, 212, 255, 0.1)' // Boosted from 0.05
     ctx.lineWidth = 1
     const minorSize = 25
     for(let x = -limit; x < limit; x += minorSize) {
@@ -453,7 +517,7 @@ const drawGrid = (ctx, canvas) => {
 
     // Major Grid Lines (Every 125px)
     ctx.beginPath()
-    ctx.strokeStyle = 'rgba(0, 212, 255, 0.08)'
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)' // Boosted from 0.15 and slightly brighter
     ctx.lineWidth = 1.5
     const majorSize = 125
     for(let x = -limit; x < limit; x += majorSize) {
@@ -647,38 +711,344 @@ const drawCar = (ctx, x, y, color, label) => {
     ctx.restore()
 }
 
-const drawBoat = (ctx, x, y, color, label) => {
+const drawSwimmer = (ctx, x, y, color, label, atBank = false) => {
     ctx.save()
     ctx.translate(x, y)
     
-    // Hull Glow
-    ctx.shadowBlur = 15
-    ctx.shadowColor = color
+    // Physics-based Heading
+    const heading = atBank ? 0 : -(props.angle1 * Math.PI) / 180
+    ctx.rotate(heading)
     
-    // Hull
-    ctx.fillStyle = '#1e293b'
-    ctx.strokeStyle = color
-    ctx.lineWidth = 2
+    // Animation constants
+    const speedScale = props.v1 / 5 
+    const strokeCycle = time.value * 8 * Math.max(0.5, speedScale)
+    const celebrationWave = Math.sin(time.value * 10) 
+    const stroke = atBank ? 0 : Math.sin(strokeCycle)
+    const bodyRoll = atBank ? 0 : Math.sin(strokeCycle) * 0.25
+    
+    // Breathing Cycle (every ~3.5 strokes)
+    const breathCycle = (strokeCycle / (Math.PI * 2)) % 3.5
+    const breathing = !atBank && breathCycle < 0.5 // Breathing phase
+    const headTurn = breathing ? Math.min(breathCycle * 2, 1) * 0.6 : 0 // Turn head to side
+    
+    // 0. Environmental Displacement (Bow Wave & Wake)
+    if (!atBank && props.v1 > 0.5) {
+        ctx.save()
+        ctx.globalAlpha = 0.15
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 2
+        
+        // Bow Wave (around head)
+        ctx.beginPath()
+        ctx.arc(15, 0, 10 + Math.sin(time.value * 5) * 2, -Math.PI/2, Math.PI/2)
+        ctx.stroke()
+        
+        // V-Wake (trailing)
+        ctx.setLineDash([10, 20])
+        ctx.beginPath()
+        ctx.moveTo(10, 0)
+        ctx.lineTo(-60, -30)
+        ctx.moveTo(10, 0)
+        ctx.lineTo(-60, 30)
+        ctx.stroke()
+        ctx.restore()
+    }
+
+    // 1. Water Disturbance (Bust/Shoulders)
+    ctx.save()
+    ctx.globalAlpha = 0.2
+    ctx.fillStyle = '#fff'
     ctx.beginPath()
-    ctx.moveTo(-25, -10)
+    ctx.ellipse(5, 0, 18, 14, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+
+    // 2. Anatomical Body & Lighting (Torso)
+    const lightAngle = bodyRoll * 30 // lighting shift based on roll
+    const torsoGrad = ctx.createLinearGradient(-10, -10, 10, 10)
+    torsoGrad.addColorStop(0, '#be185d') // Dark
+    torsoGrad.addColorStop(0.5 + bodyRoll * 0.3, '#ec4899') // Dynamic highlight
+    torsoGrad.addColorStop(1, '#be185d') 
+    
+    ctx.save()
+    ctx.rotate(bodyRoll) 
+    
+    // Torso Shape with Straps
+    ctx.fillStyle = torsoGrad
+    ctx.beginPath()
+    ctx.moveTo(10, -7)
+    ctx.bezierCurveTo(15, -7, 15, 7, 10, 7)
+    ctx.lineTo(-12, 6)
+    ctx.bezierCurveTo(-18, 5, -18, -5, -12, -6)
+    ctx.closePath()
+    ctx.fill()
+    
+    // Swimsuit Straps & Detail
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(8, -6); ctx.lineTo(12, -4)
+    ctx.moveTo(8, 6); ctx.lineTo(12, 4)
+    ctx.stroke()
+    ctx.restore()
+    
+    // 3. Head & Gear
+    ctx.save()
+    ctx.rotate((bodyRoll + headTurn) * 0.5) // Head rolls with body AND turns for breath
+    // Neck
+    ctx.fillStyle = '#FDBA74' 
+    ctx.fillRect(8, -2, 5, 4)
+    // Head/Swim Cap with Highlight
+    const capGrad = ctx.createRadialGradient(13 + (bodyRoll + headTurn) * 5, -2, 1, 13, 0, 7)
+    capGrad.addColorStop(0, '#fff') 
+    capGrad.addColorStop(1, '#1e293b') 
+    ctx.fillStyle = capGrad
+    ctx.beginPath()
+    ctx.arc(14, 0, 6.5, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // Mouth (open during breathing)
+    if(breathing) {
+        ctx.fillStyle = '#dc2626'
+        ctx.beginPath()
+        ctx.ellipse(18, 0, 2, 1.5, 0, 0, Math.PI * 2)
+        ctx.fill()
+    }
+    
+    // Goggles (Reflective)
+    const gogColor = `hsla(200, 100%, ${70 + bodyRoll * 20}%, 0.8)`
+    ctx.fillStyle = gogColor
+    ctx.beginPath()
+    ctx.arc(17, -2.5, 2.2, 0, Math.PI * 2)
+    ctx.arc(17, 2.5, 2.2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+
+    // 4. Arms (Hands with Fingers)
+    const drawLimb = (isRight) => {
+        const side = isRight ? 1 : -1
+        const phaseOffset = isRight ? Math.PI : 0
+        const armCycle = strokeCycle + phaseOffset
+        const armStroke = Math.sin(armCycle)
+        const armReach = Math.cos(armCycle)
+        
+        ctx.save()
+        // Skin Shading
+        const skinGrad = ctx.createLinearGradient(0, -5, 0, 5)
+        skinGrad.addColorStop(0, '#fde68a') // Highlighted skin
+        skinGrad.addColorStop(1, '#FDBA74')
+        ctx.strokeStyle = skinGrad
+        ctx.lineWidth = 4.5
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+
+        ctx.beginPath()
+        ctx.moveTo(5, side * 7) 
+        
+        let handX, handY;
+        if (atBank) {
+            // Static standing pose - arms relaxed at sides
+            const elbowX = 2
+            const elbowY = side * 12
+            handX = -5
+            handY = side * 18
+            ctx.lineTo(elbowX, elbowY)
+            ctx.lineTo(handX, handY)
+        } else if (armStroke > 0) {
+            const elbowX = 8 + armReach * 6
+            const elbowY = side * (14 + armStroke * 10)
+            handX = 20 + armReach * 10
+            handY = side * 6
+            ctx.lineTo(elbowX, elbowY)
+            ctx.lineTo(handX, handY)
+            
+            // Splash at entry
+            if (armStroke > 0.7) {
+                ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5
+                for(let i=0; i<4; i++) { ctx.beginPath(); ctx.arc(handX + Math.random()*8, handY + side*Math.random()*5, 1.2, 0, Math.PI*2); ctx.fill() }
+            }
+        } else {
+            ctx.globalAlpha = 0.7
+            const reach = -armStroke * 18
+            handX = -reach; handY = side * 12
+            ctx.quadraticCurveTo(5, side * 18, handX, handY)
+            
+            // Bubbles trail
+            ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.3
+            ctx.beginPath(); ctx.arc(handX - 6, handY, 1.8, 0, Math.PI*2); ctx.fill()
+        }
+        ctx.stroke()
+        
+        // Detailed Hand (Fingers) - only when swimming
+        if (!atBank) {
+            ctx.save()
+            ctx.translate(handX, handY)
+            ctx.rotate(isRight ? -Math.PI/4 : Math.PI/4)
+            ctx.lineWidth = 1.2
+            for(let i=-2; i<=2; i++) {
+                ctx.beginPath(); ctx.moveTo(0, i*1.2); ctx.lineTo(4, i*0.8); ctx.stroke()
+            }
+            ctx.restore()
+        }
+        ctx.restore()
+    }
+    
+    drawLimb(false) 
+    drawLimb(true)  
+
+    // 5. Legs (Feet with Toes)
+    const kickCycle = time.value * 22 * Math.max(0.3, speedScale)
+    const drawLeg = (isRight) => {
+        const side = isRight ? 1 : -1
+        const phase = isRight ? 0 : Math.PI
+        const kick = atBank ? 0 : Math.sin(kickCycle + phase) * 8 // No kick when at bank
+        
+        ctx.save()
+        ctx.strokeStyle = '#FDBA74'
+        ctx.lineWidth = 4
+        ctx.beginPath()
+        ctx.moveTo(-12, side * 5) 
+        let footX, footY;
+        if (atBank) {
+            // Static standing position - legs straight
+            footX = -30; footY = side * 10
+            ctx.lineTo(footX, footY)
+        } else {
+            footX = -35; footY = side * 8 + kick
+            ctx.quadraticCurveTo(-22, side * 7 + kick * 0.5, footX, footY)
+        }
+        ctx.stroke()
+        
+        // Detailed Foot (Toes/Arch) - only when swimming
+        if (!atBank) {
+            ctx.save()
+            ctx.translate(footX, footY)
+            ctx.rotate(kick * 0.05)
+            ctx.lineWidth = 1
+            for(let i=-1.5; i<=1.5; i++) {
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(-3, i*0.7); ctx.stroke()
+            }
+            ctx.restore()
+        }
+        ctx.restore()
+    }
+    drawLeg(false)
+    drawLeg(true)
+
+    // 6. Label
+    ctx.restore()
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 13px Inter, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(label, 0, -32)
+    ctx.restore()
+}
+
+const drawBoat = (ctx, x, y, color, label) => {
+    // 0. Water Interaction: Soft shadow & reflection (Screenspace-ish but in Sim coords)
+    ctx.save()
+    ctx.translate(x, y + 5) // Offset for reflection
+    ctx.scale(1, -0.4) // Squashed vertical reflection
+    ctx.globalAlpha = 0.2
+    
+    // Simplified reflection hull
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.moveTo(-30, -10)
     ctx.lineTo(15, -10)
-    ctx.quadraticCurveTo(30, 0, 15, 10)
-    ctx.lineTo(-25, 10)
+    ctx.quadraticCurveTo(35, 0, 15, 10)
+    ctx.lineTo(-30, 10)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+
+    ctx.save()
+    ctx.translate(x, y)
+    
+    // Boat Heading: points in direction of V_BW (props.angle1)
+    const heading = -(props.angle1 * Math.PI) / 180
+    ctx.rotate(heading)
+    
+    // 1. Wake Effect (Behind boat)
+    ctx.save()
+    ctx.globalAlpha = 0.3 * (0.5 + 0.5 * Math.sin(time.value * 10))
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([5, 10])
+    ctx.beginPath()
+    ctx.moveTo(-30, 0)
+    ctx.lineTo(-60, -15)
+    ctx.moveTo(-30, 0)
+    ctx.lineTo(-60, 15)
+    ctx.stroke()
+    ctx.restore()
+
+    // 2. Hull Shadow
+    ctx.shadowBlur = 10
+    ctx.shadowColor = 'rgba(0,0,0,0.4)'
+    ctx.shadowOffsetY = 4
+
+    // 3. Main Hull (Realistic Pointed Shape)
+    const hullGradient = ctx.createLinearGradient(0, -15, 0, 15)
+    hullGradient.addColorStop(0, '#334155') // Slated dark blue
+    hullGradient.addColorStop(0.5, '#475569')
+    hullGradient.addColorStop(1, '#1e293b')
+
+    ctx.fillStyle = hullGradient
+    ctx.strokeStyle = color // Neon accent from scenario
+    ctx.lineWidth = 2
+    
+    ctx.beginPath()
+    ctx.moveTo(-30, -12) // Stern Left
+    ctx.lineTo(15, -12)  // Mid Right
+    ctx.quadraticCurveTo(40, 0, 15, 12) // Bow tip curve
+    ctx.lineTo(-30, 12)  // Stern Right
+    ctx.bezierCurveTo(-35, 12, -35, -12, -30, -12) // Stern back curve
     ctx.closePath()
     ctx.fill()
     ctx.stroke()
+
+    // 4. Deck Detail
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'
+    ctx.beginPath()
+    ctx.roundRect(-20, -8, 30, 16, 4)
+    ctx.fill()
     
-    // Deck
-    ctx.fillStyle = 'rgba(255,255,255,0.1)'
-    ctx.fillRect(-15, -5, 20, 10)
+    // 5. Cockpit/Windshield
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.8)'
+    ctx.beginPath()
+    ctx.moveTo(5, -6)
+    ctx.lineTo(15, -6)
+    ctx.lineTo(20, 0)
+    ctx.lineTo(15, 6)
+    ctx.lineTo(5, 6)
+    ctx.fill()
     
-    // Label
+    // 6. Navigation Lights
+    ctx.shadowBlur = 5
+    ctx.shadowColor = '#f00' // Red (Port)
+    ctx.fillStyle = '#f00'
+    ctx.beginPath()
+    ctx.arc(-25, -8, 2, 0, Math.PI * 2)
+    ctx.fill()
+    
+    ctx.shadowColor = '#0f0' // Green (Starboard)
+    ctx.fillStyle = '#0f0'
+    ctx.beginPath()
+    ctx.arc(-25, 8, 2, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 7. Identity Label (Floating, Un-rotated)
+    ctx.restore()
+    ctx.save()
+    ctx.translate(x, y)
     ctx.shadowBlur = 0
     ctx.fillStyle = '#fff'
-    ctx.font = 'bold 12px Inter, sans-serif'
+    ctx.font = 'bold 13px Inter, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(label, 0, -20)
-    
+    ctx.fillText(label, 0, -35)
     ctx.restore()
 }
 
@@ -780,31 +1150,316 @@ const drawRoad = (ctx, canvas, y) => {
 const drawRiver = (ctx, canvas) => {
     const width = 10000
     const height = 400
-    const yStart = -50 
+    const yStart = -50
+    const bankHeight = 200 // Define early since it's used in sky calculations
     
-    // Water Gradient
+    // ===== 0. SKY & ATMOSPHERE =====
+    const skyHeight = 300
+    const skyGrad = ctx.createLinearGradient(0, yStart - bankHeight - skyHeight, 0, yStart - bankHeight)
+    skyGrad.addColorStop(0, '#1e3a8a') // Deep blue at top
+    skyGrad.addColorStop(0.6, '#60a5fa') // Mid blue
+    skyGrad.addColorStop(1, '#93c5fd') // Light blue near horizon
+    ctx.fillStyle = skyGrad
+    ctx.fillRect(-width/2, yStart - bankHeight - skyHeight, width, skyHeight)
+    
+    // Sun Position
+    const sunX = -800 + Math.sin(time.value * 0.1) * 200
+    const sunY = yStart - bankHeight - 200
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 60)
+    sunGrad.addColorStop(0, '#fef3c7')
+    sunGrad.addColorStop(0.3, '#fde68a')
+    sunGrad.addColorStop(1, 'rgba(253, 230, 138, 0)')
+    ctx.fillStyle = sunGrad
+    ctx.fillRect(sunX - 60, sunY - 60, 120, 120)
+    
+    // Procedural Clouds
+    const drawCloud = (x, y, size, speed) => {
+        const offsetX = (time.value * speed * 5) % (width * 1.5) - width/2
+        ctx.save()
+        ctx.globalAlpha = 0.7
+        ctx.fillStyle = '#fff'
+        for(let i=0; i<5; i++) {
+            ctx.beginPath()
+            ctx.arc(x + offsetX + i*size*0.4, y + Math.sin(i) * size*0.2, size * (0.5 + i*0.1), 0, Math.PI*2)
+            ctx.fill()
+        }
+        ctx.restore()
+    }
+    
+    drawCloud(-1000, yStart - bankHeight - 220, 25, 0.3)
+    drawCloud(-200, yStart - bankHeight - 260, 30, 0.2)
+    drawCloud(400, yStart - bankHeight - 200, 20, 0.4)
+    drawCloud(1000, yStart - bankHeight - 240, 35, 0.15)
+    
+    // ===== 1. BANKS WITH ENHANCED DETAILS =====
+    
+    // Upper Bank
+    const upperGrad = ctx.createLinearGradient(0, yStart - bankHeight, 0, yStart)
+    upperGrad.addColorStop(0, '#064e3b')
+    upperGrad.addColorStop(0.7, '#14532d')
+    upperGrad.addColorStop(1, '#22c55e') // Brighter grass
+    ctx.fillStyle = upperGrad
+    ctx.fillRect(-width/2, yStart - bankHeight, width, bankHeight)
+    
+    // Lower Bank
+    const lowerGrad = ctx.createLinearGradient(0, yStart + height, 0, yStart + height + bankHeight)
+    lowerGrad.addColorStop(0, '#22c55e')
+    lowerGrad.addColorStop(0.3, '#14532d')
+    lowerGrad.addColorStop(1, '#064e3b')
+    ctx.fillStyle = lowerGrad
+    ctx.fillRect(-width/2, yStart + height, width, bankHeight)
+    
+    // Individual Grass Blades (swaying)
+    ctx.save()
+    ctx.strokeStyle = '#15803d'
+    ctx.lineWidth = 1
+    for(let x = -2000; x < 2000; x += 15) {
+        for(let bank of [-1, 1]) {
+            const baseY = bank === -1 ? yStart - 30 : yStart + height + 30
+            const sway = Math.sin(time.value * 2 + x * 0.1) * 3
+            ctx.beginPath()
+            ctx.moveTo(x, baseY)
+            ctx.quadraticCurveTo(x + sway, baseY - 10, x + sway * 1.5, baseY - 15)
+            ctx.stroke()
+        }
+    }
+    ctx.restore()
+    
+    // Wildflowers
+    const drawFlower = (x, y, color) => {
+        ctx.fillStyle = color
+        for(let i=0; i<5; i++) {
+            const angle = (i / 5) * Math.PI * 2
+            ctx.beginPath()
+            ctx.arc(x + Math.cos(angle)*3, y + Math.sin(angle)*3, 2, 0, Math.PI*2)
+            ctx.fill()
+        }
+        ctx.fillStyle = '#fbbf24'
+        ctx.beginPath()
+        ctx.arc(x, y, 1.5, 0, Math.PI*2)
+        ctx.fill()
+    }
+    
+    for(let x = -2000; x < 2000; x += 180) {
+        const flowerSeed = Math.abs(Math.sin(x * 0.5))
+        if(flowerSeed > 0.6) {
+            drawFlower(x + 30, yStart - 25, '#a855f7') // Purple
+            drawFlower(x - 20, yStart + height + 25, '#fbbf24') // Yellow
+        }
+    }
+    
+    // Sandy Shoreline
+    const sandGrad = ctx.createLinearGradient(0, yStart - 5, 0, yStart + 5)
+    sandGrad.addColorStop(0, '#f59e0b')
+    sandGrad.addColorStop(1, '#fde68a')
+    ctx.fillStyle = sandGrad
+    ctx.fillRect(-width/2, yStart - 5, width, 10)
+    ctx.fillRect(-width/2, yStart + height - 5, width, 10)
+    
+    // ===== 2. WATER WITH CAUSTICS & REFLECTIONS =====
     const waterGrad = ctx.createLinearGradient(0, yStart, 0, yStart + height)
-    waterGrad.addColorStop(0, '#0f172a')
-    waterGrad.addColorStop(0.5, '#1e3a8a')
-    waterGrad.addColorStop(1, '#0f172a')
-    
+    waterGrad.addColorStop(0, '#0c4a6e')
+    waterGrad.addColorStop(0.3, '#0369a1')
+    waterGrad.addColorStop(0.7, '#0284c7')
+    waterGrad.addColorStop(1, '#0c4a6e')
     ctx.fillStyle = waterGrad
     ctx.fillRect(-width/2, yStart, width, height)
     
-    // Water Ripples
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
-    ctx.lineWidth = 1
-    for(let i = 0; i < 15; i++) {
-        const rippleY = yStart + (i * 20 + time.value * 20) % height
+    // Caustics (animated light patterns)
+    ctx.save()
+    ctx.globalAlpha = 0.1
+    ctx.strokeStyle = '#7dd3fc'
+    ctx.lineWidth = 2
+    for(let i=0; i<15; i++) {
+        const y = yStart + (i * 30)
+        const offset = Math.sin(time.value * 3 + i) * 40
         ctx.beginPath()
-        ctx.moveTo(-width/2, rippleY)
-        ctx.lineTo(width/2, rippleY)
+        ctx.moveTo(-width/2, y)
+        for(let x=-width/2; x<width/2; x+=100) {
+            ctx.quadraticCurveTo(
+                x + 50 + offset, 
+                y + Math.sin(x * 0.01 + time.value * 2) * 10,
+                x + 100, 
+                y
+            )
+        }
         ctx.stroke()
     }
+    ctx.restore()
+    
+    // Sky reflection in water
+    ctx.save()
+    ctx.globalAlpha = 0.15
+    ctx.fillStyle = '#93c5fd'
+    ctx.fillRect(-width/2, yStart + 50, width, 100)
+    ctx.restore()
+    
+    // ===== 3. BANK DECORATIONS =====
+    const drawDecoration = (x, y, type) => {
+        ctx.save()
+        ctx.translate(x, y)
+        if (type === 'tree') {
+            ctx.fillStyle = '#713f12'
+            ctx.fillRect(-4, 0, 8, 20)
+            ctx.fillStyle = '#15803d'
+            ctx.beginPath()
+            ctx.moveTo(0, -30)
+            ctx.lineTo(-18, 0)
+            ctx.lineTo(18, 0)
+            ctx.fill()
+            ctx.beginPath()
+            ctx.moveTo(0, -40)
+            ctx.lineTo(-14, -12)
+            ctx.lineTo(14, -12)
+            ctx.fill()
+        } else if (type === 'rock') {
+            const rockGrad = ctx.createRadialGradient(-3, -2, 2, 0, 0, 12)
+            rockGrad.addColorStop(0, '#94a3b8')
+            rockGrad.addColorStop(1, '#475569')
+            ctx.fillStyle = rockGrad
+            ctx.beginPath()
+            ctx.ellipse(0, 0, 16, 9, Math.PI/4, 0, Math.PI * 2)
+            ctx.fill()
+        } else if (type === 'bush') {
+            ctx.fillStyle = '#166534'
+            for(let i=0; i<3; i++) {
+                ctx.beginPath()
+                ctx.arc(-10 + i*10, -i*3, 12, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
+        ctx.restore()
+    }
+    
+    for (let x = -2000; x < 2000; x += 250) {
+        const seedUpper = Math.abs(Math.sin(x))
+        if (seedUpper > 0.6) drawDecoration(x, yStart - 50, 'tree')
+        else if (seedUpper > 0.3) drawDecoration(x + 50, yStart - 25, 'bush')
+        
+        const seedLower = Math.abs(Math.cos(x * 0.7))
+        if (seedLower > 0.7) drawDecoration(x + 100, yStart + height + 25, 'rock')
+        else if (seedLower > 0.4) drawDecoration(x - 80, yStart + height + 40, 'bush')
+    }
+    
+    // ===== 4. ENVIRONMENTAL LIFE =====
+    // Flying Birds
+    const drawBird = (x, y, wingPhase) => {
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.strokeStyle = '#1f2937'
+        ctx.lineWidth = 1.5
+        const wingY = Math.sin(wingPhase) * 4
+        ctx.beginPath()
+        ctx.moveTo(-6, wingY)
+        ctx.lineTo(0, 0)
+        ctx.lineTo(6, wingY)
+        ctx.stroke()
+        ctx.restore()
+    }
+    
+    const bird1X = (-1500 + time.value * 30) % 3000 - 1500
+    const bird2X = (-800 + time.value * 25) % 3000 - 1500
+    const bird3X = (200 + time.value * 35) % 3000 - 1500
+    drawBird(bird1X, yStart - bankHeight - 150, time.value * 8)
+    drawBird(bird2X, yStart - bankHeight - 180, time.value * 8 + Math.PI)
+    drawBird(bird3X, yStart - bankHeight - 120, time.value * 8 + Math.PI/2)
+    
+    // Jumping Fish
+    const fishJump = Math.sin(time.value * 2) > 0.95
+    if(fishJump) {
+        const fishX = Math.sin(time.value * 0.5) * 800
+        const splashY = yStart + height/2
+        ctx.save()
+        ctx.fillStyle = '#cbd5e1'
+        ctx.beginPath()
+        ctx.arc(fishX, splashY - 15, 4, 0, Math.PI * 2)
+        ctx.fill()
+        // Splash
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1
+        for(let i=0; i<6; i++) {
+            const angle = (i/6) * Math.PI * 2
+            ctx.beginPath()
+            ctx.moveTo(fishX, splashY)
+            ctx.lineTo(fishX + Math.cos(angle)*8, splashY + Math.sin(angle)*8)
+            ctx.stroke()
+        }
+        ctx.restore()
+    }
+    
+    // Dragonflies
+    const drawDragonfly = (x, y, phase) => {
+        ctx.save()
+        ctx.translate(x, y)
+        const hover = Math.sin(phase) * 3
+        ctx.strokeStyle = '#0ea5e9'
+        ctx.lineWidth = 0.5
+        ctx.beginPath()
+        ctx.moveTo(0, hover)
+        ctx.lineTo(4, hover - 1)
+        ctx.moveTo(0, hover)
+        ctx.lineTo(4, hover + 1)
+        ctx.stroke()
+        ctx.fillStyle = '#0369a1'
+        ctx.fillRect(-1, hover - 0.5, 3, 1)
+        ctx.restore()
+    }
+    
+    drawDragonfly(-600 + Math.sin(time.value) * 50, yStart - 15, time.value * 20)
+    drawDragonfly(400 + Math.cos(time.value * 0.7) * 60, yStart + height + 15, time.value * 20 + Math.PI)
+    
+    // Floating Debris (Leaves)
+    const drawLeaf = (x, y) => {
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.rotate(Math.sin(time.value + x) * 0.3)
+        ctx.fillStyle = '#84cc16'
+        ctx.beginPath()
+        ctx.ellipse(0, 0, 5, 3, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+    }
+    
+    for(let i=0; i<8; i++) {
+        const leafX = ((i * 400 - 1600) + time.value * (props.v2 || 1) * 15) % 3200 - 1600
+        const leafY = yStart + height * (0.3 + (i % 3) * 0.2)
+        drawLeaf(leafX, leafY)
+    }
+    
+    // 4. Animated Water Current Lines (Hozizontal scrolling)
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([40, 60])
+    
+    // The offset scrolls with the river speed v2
+    const flowOffset = (time.value * props.v2 * 10) % 100
+    
+    for (let i = 0; i < 20; i++) {
+        const rowY = yStart + (i * 20) + 10
+        ctx.beginPath()
+        ctx.lineDashOffset = -flowOffset * (1 + (i % 3) * 0.2) // Varied speeds for layers
+        ctx.moveTo(-width/2, rowY)
+        ctx.lineTo(width/2, rowY)
+        ctx.stroke()
+    }
+    ctx.restore()
 
-    // Banks
+    // 5. Water Surface Glare (Shimmer)
+    ctx.globalAlpha = 0.05
+    ctx.fillStyle = '#fff'
+    for(let i = 0; i < 10; i++) {
+        const x = ((time.value * 50 + i * 400) % 2000) - 1000
+        const y = yStart + (Math.sin(i + time.value) * 150 + 200)
+        ctx.beginPath()
+        ctx.ellipse(x, y, 100, 2, 0, 0, Math.PI * 2)
+        ctx.fill()
+    }
+    ctx.globalAlpha = 1.0
+
+    // Banks Sharp Edges
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'
-    ctx.lineWidth = 4
+    ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(-width/2, yStart)
     ctx.lineTo(width/2, yStart)
@@ -1112,6 +1767,90 @@ const drawMan = (ctx, x, y) => {
     }
 }
 
+const drawRiverVectorDiagram = (ctx, x, y, userScale = 1.0) => {
+    ctx.save()
+    ctx.translate(x, y + 50) // Shift down to avoid border overlap
+    ctx.scale(userScale, userScale)
+
+    const s = 15 // Scale factor for visibility
+    const angleRad = (props.angle1 * Math.PI) / 180
+    
+    // 1. Boat/Swimmer Velocity rel. Water (V_BW / V_SW)
+    const vbw = { x: props.v1 * Math.cos(angleRad) * s, y: -props.v1 * Math.sin(angleRad) * s }
+    
+    // 2. River Velocity rel. Ground (V_RG) - Applied at the tip of V_BW
+    const vrg = { x: props.v2 * s, y: 0 }
+    
+    // 3. Resultant Ground Velocity (V_BG)
+    const vbg = { x: vbw.x + vrg.x, y: vbw.y }
+
+    // Helper: Draw Arrow
+    const drawArrow = (from, to, color, label, lOffset = {x: 0, y: 0}) => {
+        ctx.save()
+        // Added glow effect to vectors
+        ctx.shadowBlur = 6
+        ctx.shadowColor = color
+        
+        ctx.beginPath()
+        ctx.moveTo(from.x, from.y)
+        ctx.lineTo(to.x, to.y)
+        ctx.strokeStyle = color
+        ctx.lineWidth = 3
+        ctx.stroke()
+        
+        const angle = Math.atan2(to.y - from.y, to.x - from.x)
+        const head = 10
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(to.x, to.y)
+        ctx.lineTo(to.x - head * Math.cos(angle - Math.PI/6), to.y - head * Math.sin(angle - Math.PI/6))
+        ctx.lineTo(to.x - head * Math.cos(angle + Math.PI/6), to.y - head * Math.sin(angle + Math.PI/6))
+        ctx.closePath()
+        ctx.fill()
+        ctx.restore()
+        
+        if (label) {
+            ctx.save()
+            ctx.font = 'bold 12px Inter'
+            ctx.fillStyle = color
+            // Text shadow for legibility
+            ctx.shadowBlur = 4
+            ctx.shadowColor = 'rgba(0,0,0,0.9)'
+            ctx.fillText(label, (from.x + to.x)/2 + lOffset.x, (from.y + to.y)/2 + lOffset.y)
+            ctx.restore()
+        }
+    }
+
+    // Axes (Simplified)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.setLineDash([2, 5])
+    ctx.beginPath(); ctx.moveTo(-50, 0); ctx.lineTo(150, 0); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(0, 50); ctx.stroke()
+    ctx.setLineDash([])
+
+    const labels = {
+        main: props.visualTheme === 'swimmer' ? 'v_SW' : 'v_BW',
+        ground: props.visualTheme === 'swimmer' ? 'v_SG' : 'v_BG'
+    }
+
+    // Draw Vector Triangle (Tip-to-Tail)
+    drawArrow({x:0, y:0}, vbw, '#00ff9d', labels.main, {x: -30, y: -10})
+    drawArrow(vbw, vbg, '#60a5fa', 'v_RG', {x: 0, y: -15})
+    drawArrow({x:0, y:0}, vbg, '#fcd34d', labels.ground, {x: 0, y: 30})
+
+    // Subtitle
+    ctx.save()
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '10px Inter'
+    ctx.shadowBlur = 2
+    ctx.shadowColor = '#000'
+    ctx.fillText('Velocity Addition Diagram', -50, -60)
+    ctx.fillText('(Tip-to-Tail method)', -50, -45)
+    ctx.restore()
+
+    ctx.restore()
+}
+
 
 const drawRain = (ctx, x, y) => {
     // Rain angle
@@ -1295,7 +2034,11 @@ const drawRainVectorDiagram = (ctx, x, y, userScale = 1.0) => {
     drawArrow(O, M, '#f87171')
     drawArrow(O, R, '#60a5fa')
 
-    // Labels
+    // Labels with Shadow
+    ctx.save()
+    ctx.shadowBlur = 4
+    ctx.shadowColor = 'black'
+    
     ctx.fillStyle = '#f87171'
     ctx.font = 'bold 12px Inter'
     ctx.fillText('v_M', M.x/2, M.y - 10)
@@ -1308,6 +2051,7 @@ const drawRainVectorDiagram = (ctx, x, y, userScale = 1.0) => {
     ctx.font = '10px Inter'
     ctx.textAlign = 'left'
     ctx.fillText('Ground Frame (Originals)', -50, -20)
+    ctx.restore()
     
     ctx.restore()
 }
@@ -1392,7 +2136,10 @@ const drawRainComponentDiagram = (ctx, x, y, userScale = 1.0) => {
     drawComponentArrow(endPoint, '#ef4444', rainVec) // -V_M arrow
     drawComponentArrow(endPoint, '#fcd34d') // Resultant Arrow
     
-    // Labels
+    // Labels with Shadow
+    ctx.save()
+    ctx.shadowBlur = 4
+    ctx.shadowColor = 'black'
     ctx.font = 'bold 11px Inter'
     ctx.textAlign = 'center'
     
@@ -1405,6 +2152,7 @@ const drawRainComponentDiagram = (ctx, x, y, userScale = 1.0) => {
     ctx.textAlign = 'left'
     ctx.fillStyle = '#fcd34d'
     ctx.fillText('v_RM', endPoint.x/2 - 30, endPoint.y/2 + 20)
+    ctx.restore()
     
     ctx.restore()
 }
@@ -1615,7 +2363,7 @@ defineExpose({ reset: initSimulation, addObject, objects, selectedObjectId })
     <!-- Physics Logic Overlay for Rain Scenario -->
     <div 
         class="physics-overlay glass-panel" 
-        v-if="mode === 'rain'" 
+        v-if="mode === 'rain' && showTheta" 
         :style="{ 
             position: 'absolute', 
             top: overlayPos.top + 'px', 
