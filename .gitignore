@@ -31,8 +31,8 @@ build/
 logs/
 *.log
 
-# Admin dashboard (standalone - being integrated)
-admin/
+# Admin dashboard (standalone - at root level only)
+/admin/
 
 # Gemini artifacts (documentation only)
 .gemini/
