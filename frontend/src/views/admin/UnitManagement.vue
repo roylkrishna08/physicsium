@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue';
 import { useAdminStore } from '../../stores/admin';
 import { useAuthStore } from '../../stores/auth';
 import { BookOpen, Eye, EyeOff, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-vue-next';
+import { jeeSyllabus } from '../../data/jee-syllabus.js';
 
 const adminStore = useAdminStore();
 const authStore = useAuthStore();
@@ -12,34 +13,42 @@ onMounted(async () => {
     await adminStore.fetchUnits();
 });
 
-const categories = ['all', 'mechanics', 'thermodynamics', 'electromagnetism', 'optics', 'modern-physics', 'other'];
+const categories = ['all', 'mechanics', 'thermodynamics', 'electromagnetism', 'optics', 'modern-physics', 'experimental', 'other'];
+
+const getUnitCategory = (unitNumber, title) => {
+    const num = parseInt(unitNumber.replace(/\D/g, ''));
+    const t = title.toLowerCase();
+    
+    if (num === 20 || t.includes('experimental')) return 'experimental';
+    if (num <= 7 || num === 10) return 'mechanics';
+    if (num === 8 || num === 9) return 'thermodynamics';
+    if (num >= 11 && num <= 15) return 'electromagnetism';
+    if (num === 16) return 'optics';
+    if (num >= 17 && num <= 19) return 'modern-physics';
+    return 'other';
+};
 
 const handleToggleVisibility = async (id) => {
   await adminStore.toggleUnit(id);
 };
 
 const handleSync = async () => {
-    const allUnits = [
-        { unitId: 'unit-1', unitNumber: 'UNIT 1', title: 'Units and Measurements', title_hi: 'मात्रक और मापन', category: 'other', hasSimulations: false },
-        { unitId: 'unit-2', unitNumber: 'UNIT 2', title: 'Kinematics', title_hi: 'शुद्धगतिकी', category: 'mechanics', hasSimulations: true },
-        { unitId: 'unit-3', unitNumber: 'UNIT 3', title: 'Laws of Motion', title_hi: 'गति के नियम', category: 'mechanics', hasSimulations: false },
-        { unitId: 'unit-4', unitNumber: 'UNIT 4', title: 'Work, Energy and Power', title_hi: 'कार्य, ऊर्जा और शक्ति', category: 'mechanics', hasSimulations: false },
-        { unitId: 'unit-5', unitNumber: 'UNIT 5', title: 'Rotational Motion', title_hi: 'घूर्णन गति', category: 'mechanics', hasSimulations: false },
-        { unitId: 'unit-6', unitNumber: 'UNIT 6', title: 'Gravitation', title_hi: 'गुरुत्वाकर्षण', category: 'mechanics', hasSimulations: true },
-        { unitId: 'unit-7', unitNumber: 'UNIT 7', title: 'Properties of Solids and Liquids', title_hi: 'ठोस और द्रवों के गुण', category: 'mechanics', hasSimulations: false },
-        { unitId: 'unit-8', unitNumber: 'UNIT 8', title: 'Thermodynamics', title_hi: 'ऊष्मागतिकी', category: 'thermodynamics', hasSimulations: false },
-        { unitId: 'unit-9', unitNumber: 'UNIT 9', title: 'Kinetic Theory of Gases', title_hi: 'गैसों का अणुगति सिद्धांत', category: 'thermodynamics', hasSimulations: false },
-        { unitId: 'unit-10', unitNumber: 'UNIT 10', title: 'Oscillations and Waves', title_hi: 'दोलन और तरंगें', category: 'mechanics', hasSimulations: false },
-        { unitId: 'unit-11', unitNumber: 'UNIT 11', title: 'Electrostatics', title_hi: 'स्थिरवैद्युतिकी', category: 'electromagnetism', hasSimulations: true },
-        { unitId: 'unit-12', unitNumber: 'UNIT 12', title: 'Current Electricity', title_hi: 'विद्युत धारा', category: 'electromagnetism', hasSimulations: false },
-        { unitId: 'unit-13', unitNumber: 'UNIT 13', title: 'Magnetic Effects of Current', title_hi: 'धारा का चुंबकीय प्रभाव', category: 'electromagnetism', hasSimulations: false },
-        { unitId: 'unit-14', unitNumber: 'UNIT 14', title: 'Electromagnetic Induction', title_hi: 'विद्युत चुंबकीय प्रेरण', category: 'electromagnetism', hasSimulations: false }
-    ];
+    // Units that have dedicated lab modules in the system
+    const unitsWithSims = ['UNIT 2', 'UNIT 6', 'UNIT 11', 'UNIT 20']; 
     
-    if (confirm(`Sync ${allUnits.length} units? This will add new ones and update existing metadata.`)) {
+    const allUnits = jeeSyllabus.map(u => ({
+        unitId: u.unit.toLowerCase().replace(/\s+/g, '-'),
+        unitNumber: u.unit,
+        title: u.title,
+        title_hi: u.title_hi,
+        category: getUnitCategory(u.unit, u.title),
+        hasSimulations: unitsWithSims.includes(u.unit)
+    }));
+    
+    if (confirm(`Sync all ${allUnits.length} units from syllabus? This will add missing ones and update metadata.`)) {
         const success = await adminStore.syncUnits(allUnits);
         if (success) {
-            alert('✅ Units synced successfully!');
+            alert('✅ All 20 units synced successfully including Experimental Skills!');
         }
     }
 };
