@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/pages/Home.vue'
+// Last Build Trigger: 2026-02-08T01:23:00Z
 import Syllabus from '../views/course/Syllabus.vue'
 import Topics from '../views/course/Topics.vue'
 import Experiments from '../views/experimentalskill/Experiments.vue'

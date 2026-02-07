@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+/** Admin Login View - Vercel Build Fix */
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { LogIn, Loader2 } from 'lucide-vue-next';
