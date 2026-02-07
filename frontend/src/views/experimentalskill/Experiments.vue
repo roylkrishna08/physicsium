@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { jeeSyllabus } from '../../data/jee-syllabus.js'
 import TopicCard from '../../components/ui/TopicCard.vue'
 import LabBackground from '../../components/backgrounds/LabBackground.vue'
@@ -7,9 +8,12 @@ import { useSearch } from '../../composables/useSearch.js'
 
 import { useRouter } from 'vue-router'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
 // Search state
 const { searchQuery } = useSearch()
 const router = useRouter()
+const hiddenSimulations = ref([])
 
 const props = defineProps({
   activeExam: String
@@ -28,32 +32,65 @@ const handleExperimentClick = (item) => {
 // Extract Experimental Skills Unit
 const experimentUnit = jeeSyllabus.find(u => u.title.toLowerCase().includes('experimental'))
 
+
+
 // Parse the numbered list
 const experiments = computed(() => {
     if (!experimentUnit) return []
     
-    // Split by numbered list pattern (e.g., "1. ", "2. ")
-    const rawText = experimentUnit.content
-    const matches = rawText.split(/\d+\.\s+/)
+    // experimentUnit is a direct object with content property
+    const content = experimentUnit.content || ''
     
-    const list = matches
-        .filter(t => t.trim().length > 0)
-        .filter(t => !t.includes('Familiarity with the basic approach')) // Exclude header text
-        .map((text, index) => {
-            const endOfFirstSentence = text.indexOf('.')
-            const title = endOfFirstSentence > -1 ? text.substring(0, endOfFirstSentence) : text
+    if (!content) {
+        console.error('No content found in experimental unit')
+        return []
+    }
+    
+    // JEE syllabus has 18 numbered experiments
+    // Map each experiment number to its simulationId in database
+    const experimentIdMap = {
+        1: 'vernier-calipers',
+        2: 'screw-gauge',
+        3: 'simple-pendulum',
+        4: 'meter-scale-mass',
+        5: 'youngs-modulus',
+        6: 'surface-tension',
+        7: 'viscosity',
+        8: 'speed-of-sound',
+        9: 'specific-heat-solid',        // (i) solid
+        10: 'specific-heat-liquid',      // (ii) liquid
+        11: 'resistivity-wire',
+        12: 'ohms-law',
+        13: 'galvanometer-resistance',
+        14: 'focal-length-mirrors-lenses',
+        15: 'refractive-index-glass',
+        16: 'pn-junction-diode',
+        17: 'zener-diode',
+        18: 'component-identification'
+    }
+    
+    const list = content
+        .split('\n')
+        .filter(line => /^\d+\./.test(line.trim()))
+        .map((line, index) => {
+            const number = index + 1
+            const parts = line.split('. ')
+            parts.shift()
+            const text = parts.join('. ').trim()
             
             return {
-                id: index + 1,
-                title: title.trim(),
-                desc: text.trim(),
+                id: number,
+                simulationId: experimentIdMap[number],
+                title: text.split('-')[0].trim(),
+                desc: text.includes('-') ? text.split('-').slice(1).join('-').trim() : 'Experimental skill lab',
                 unit: 'Experimental Skills'
             }
         })
 
-    // Add Free Lab
+    // Add Free Lab at the beginning
     list.unshift({
         id: 'freelab',
+        simulationId: 'freelab',
         title: 'Free Lab (Multipurpose)',
         desc: 'Access all physics and chemistry instruments in a free workspace. Create your own experiments.',
         unit: 'Sandbox',
@@ -63,10 +100,33 @@ const experiments = computed(() => {
     return list
 })
 
+// Fetch hidden simulations from admin backend
+onMounted(async () => {
+    try {
+        const response = await axios.get(`${API_URL}/simulations/hidden`)
+        hiddenSimulations.value = response.data.data || []
+        console.log('Hidden simulations from API:', hiddenSimulations.value)
+    } catch (error) {
+        console.error('Failed to fetch hidden simulations:', error)
+        // Continue without filtering if API fails
+    }
+})
+
 const filteredExperiments = computed(() => {
-    if (!searchQuery.value) return experiments.value
+    let exps = experiments.value
+    
+    // Filter out simulations hidden by admin
+    if (hiddenSimulations.value.length > 0) {
+        exps = exps.filter(exp => {
+            // Use the simulationId field for matching
+            return !hiddenSimulations.value.includes(exp.simulationId)
+        })
+    }
+    
+    // Apply search filter
+    if (!searchQuery.value) return exps
     const query = searchQuery.value.toLowerCase()
-    return experiments.value.filter(exp => 
+    return exps.filter(exp => 
         exp.title.toLowerCase().includes(query) || 
         exp.desc.toLowerCase().includes(query)
     )

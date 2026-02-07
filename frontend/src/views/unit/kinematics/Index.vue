@@ -1,12 +1,17 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { useRouter } from 'vue-router'
 import KinematicsBackground from '../../../components/backgrounds/KinematicsBackground.vue'
 import TopicCard from '../../../components/ui/TopicCard.vue'
 
 const router = useRouter()
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const hiddenSimulations = ref([])
 
-const kinematicsTopics = [
+const allTopics = [
   {
+    simulationId: 'frame-of-reference',
     title: "Frame of Reference",
     content: "Understanding the coordinate system and observer's perspective in motion.",
     route: '/kinematics/frame-of-reference',
@@ -14,6 +19,7 @@ const kinematicsTopics = [
     color: '#00d4ff'
   },
   {
+    simulationId: 'straight-line-motion',
     title: "Straight Line Motion",
     content: "Analysis of speed and velocity in one dimension.",
     route: '/kinematics/straight-line',
@@ -21,6 +27,7 @@ const kinematicsTopics = [
     color: '#00ff9d'
   },
   {
+    simulationId: 'acceleration',
     title: "Acceleration & Motion",
     content: "Average speed, instantaneous velocity, and uniformly accelerated motion.",
     route: '/kinematics/acceleration',
@@ -28,6 +35,7 @@ const kinematicsTopics = [
     color: '#ff0055'
   },
   {
+    simulationId: 'kinematic-graphs',
     title: "Kinematic Graphs",
     content: "Position-time and velocity-time graphs, and equations of motion.",
     route: '/kinematics/graphs',
@@ -35,6 +43,7 @@ const kinematicsTopics = [
     color: '#ffaa00'
   },
   {
+    simulationId: 'relative-velocity',
     title: "Relative Velocity",
     content: "Motion of an object as observed from another moving frame.",
     route: '/kinematics/relative-velocity',
@@ -42,6 +51,7 @@ const kinematicsTopics = [
     color: '#aa00ff'
   },
   {
+    simulationId: 'projectile-motion',
     title: "Projectile Motion",
     content: "Motion in a plane under the influence of gravity.",
     route: '/kinematics/projectile',
@@ -49,6 +59,7 @@ const kinematicsTopics = [
     color: '#ffcc00'
   },
   {
+    simulationId: 'circular-motion',
     title: "Circular Motion",
     content: "Study of uniform circular motion and centripetal acceleration.",
     route: '/kinematics/circular',
@@ -56,6 +67,21 @@ const kinematicsTopics = [
     color: '#00ffcc'
   }
 ]
+
+// Fetch hidden simulations
+onMounted(async () => {
+  try {
+    const response = await axios.get(`${API_URL}/simulations/hidden`)
+    hiddenSimulations.value = response.data.data || []
+  } catch (error) {
+    console.error('Failed to fetch hidden simulations:', error)
+  }
+})
+
+// Filter visible topics
+const kinematicsTopics = computed(() => {
+  return allTopics.filter(topic => !hiddenSimulations.value.includes(topic.simulationId))
+})
 
 const navigateTo = (route) => {
     router.push(route)

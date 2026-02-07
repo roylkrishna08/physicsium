@@ -1,4 +1,6 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { useRouter } from 'vue-router'
 import ElectrostaticsBackground from '../../../components/backgrounds/ElectrostaticsBackground.vue'
 import TopicCard from '../../../components/ui/TopicCard.vue'
@@ -6,10 +8,13 @@ import TopicCard from '../../../components/ui/TopicCard.vue'
 defineProps(['activeExam'])
 
 const router = useRouter()
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const hiddenSimulations = ref([])
 
 // Syllabus Data (Unit 11) - Mapped to routes
-const syllabusPoints = [
+const allTopics = [
   {
+    simulationId: 'coulombs-law',
     title: "Electric Charges & Fields",
     content: "Conservation of charge, Coulomb's law, forces between multiple charges, superposition principle, continuous charge distribution.",
     route: '/electrostatics/charges',
@@ -17,6 +22,7 @@ const syllabusPoints = [
     color: '#00d4ff'
   },
   {
+    simulationId: 'dipole',
     title: "Electric Field & Dipole",
     content: "Electric field due to point charge & dipole, electric field lines, torque on a dipole in uniform electric field.",
     route: '/electrostatics/dipole',
@@ -24,6 +30,7 @@ const syllabusPoints = [
     color: '#ff0055'
   },
   {
+    simulationId: 'gauss-law',
     title: "Gauss's Law",
     content: "Electric flux, Gauss's law applications: infinite wire, infinite plane sheet, thin spherical shell.",
     route: '/electrostatics/gausslaw',
@@ -31,6 +38,7 @@ const syllabusPoints = [
     color: '#00ff9d'
   },
   {
+    simulationId: 'electric-potential',
     title: "Electric Potential",
     content: "Potential due to point charge & dipole, equipotential surfaces, electrical potential energy of system of charges.",
     route: '/electrostatics/potential',
@@ -38,6 +46,7 @@ const syllabusPoints = [
     color: '#ffaa00'
   },
   {
+    simulationId: 'capacitors',
     title: "Capacitors & Dielectrics",
     content: "Conductors/insulators, dielectrics, polarization, capacitance, series/parallel combination, energy stored in capacitor.",
     route: '/electrostatics/capacitors',
@@ -45,6 +54,21 @@ const syllabusPoints = [
     color: '#aa00ff'
   }
 ]
+
+// Fetch hidden simulations
+onMounted(async () => {
+  try {
+    const response = await axios.get(`${API_URL}/simulations/hidden`)
+    hiddenSimulations.value = response.data.data || []
+  } catch (error) {
+    console.error('Failed to fetch hidden simulations:', error)
+  }
+})
+
+// Filter visible topics
+const syllabusPoints = computed(() => {
+  return allTopics.filter(topic => !hiddenSimulations.value.includes(topic.simulationId))
+})
 
 const navigateTo = (route) => {
     router.push(route)

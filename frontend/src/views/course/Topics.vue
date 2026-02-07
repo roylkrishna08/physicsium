@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { jeeSyllabus } from '../../data/jee-syllabus.js'
 import TopicCard from '../../components/ui/TopicCard.vue'
 import TopicsBackground from '../../components/backgrounds/TopicsBackground.vue'
@@ -8,22 +9,50 @@ import { useSearch } from '../../composables/useSearch.js'
 
 defineProps(['activeExam'])
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const visibleUnitIds = ref([])
+
+// Fetch visible units from admin backend
+onMounted(async () => {
+    try {
+        const response = await axios.get(`${API_URL}/units/visible`)
+        visibleUnitIds.value = response.data.data || []
+        console.log('Visible unit IDs:', visibleUnitIds.value)
+    } catch (error) {
+        console.error('Failed to fetch visible units:', error)
+        // Show all units if API fails
+        visibleUnitIds.value = jeeSyllabus.map(u => u.unit.toLowerCase().replace(/\s+/g, '-'))
+    }
+})
+
+// Filter units based on visibility
+const visibleTopics = computed(() => {
+    if (visibleUnitIds.value.length === 0) return jeeSyllabus // Show all while loading
+    
+    return jeeSyllabus.filter(topic => {
+        const unitId = topic.unit.toLowerCase().replace(/\s+/g, '-')
+        return visibleUnitIds.value.includes(unitId)
+    })
+})
+
 // Sort: Experimental Content First, then others
-const sortedTopics = [...jeeSyllabus].sort((a, b) => {
-    const isExpA = a.title.toLowerCase().includes('experimental')
-    const isExpB = b.title.toLowerCase().includes('experimental')
-    if (isExpA && !isExpB) return -1
-    if (!isExpA && isExpB) return 1
-    return 0
+const sortedTopics = computed(() => {
+    return [...visibleTopics.value].sort((a, b) => {
+        const isExpA = a.title.toLowerCase().includes('experimental')
+        const isExpB = b.title.toLowerCase().includes('experimental')
+        if (isExpA && !isExpB) return -1
+        if (!isExpA && isExpB) return 1
+        return 0
+    })
 })
 
 const { searchQuery } = useSearch()
 const router = useRouter()
 
 const filteredTopics = computed(() => {
-    if (!searchQuery.value) return sortedTopics
+    if (!searchQuery.value) return sortedTopics.value
     const query = searchQuery.value.toLowerCase()
-    return sortedTopics.filter(topic => 
+    return sortedTopics.value.filter(topic => 
         topic.title.toLowerCase().includes(query) ||
         topic.content.toLowerCase().includes(query) ||
         topic.unit.toLowerCase().includes(query)

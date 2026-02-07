@@ -6,6 +6,12 @@ const {
     updateUserRole,
     deleteUser,
     resetUserPassword,
+    getSimulations,
+    toggleSimulationVisibility,
+    syncSimulations,
+    getUnits,
+    toggleUnitVisibility,
+    syncUnits
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -29,5 +35,15 @@ router.put('/users/:id/reset-password', authorize('manager', 'owner'), passwordR
 // Owner only routes
 router.put('/users/:id/role', authorize('owner'), idParamValidation, validate, updateUserRole);
 router.delete('/users/:id', authorize('owner'), idParamValidation, validate, deleteUser);
+router.post('/simulations/sync', authorize('owner'), syncSimulations);
+
+// Manager and Owner routes
+router.get('/simulations', authorize('manager', 'owner'), getSimulations);
+router.put('/simulations/:id/toggle', authorize('manager', 'owner'), toggleSimulationVisibility);
+
+// Unit management routes
+router.get('/units', authorize('manager', 'owner'), getUnits);
+router.put('/units/:id/toggle', authorize('manager', 'owner'), toggleUnitVisibility);
+router.post('/units/sync', authorize('owner'), syncUnits);
 
 module.exports = router;

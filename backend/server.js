@@ -93,10 +93,12 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-// Routes
+// Mount routers
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/simulations', require('./routes/simulationRoutes'));
+app.use('/api/units', require('./routes/unitRoutes'));
 
 app.get('/', (req, res) => {
     res.send('Physicsium API is running...');

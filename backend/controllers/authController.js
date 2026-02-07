@@ -58,6 +58,11 @@ exports.login = asyncHandler(async (req, res, next) => {
         return next(new ErrorResponse('Your account has been restricted', 403));
     }
 
+    // Update login activity
+    user.lastLogin = Date.now();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save({ validateBeforeSave: false });
+
     sendTokenResponse(user, 200, res);
 });
 
