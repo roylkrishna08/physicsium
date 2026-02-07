@@ -8,6 +8,7 @@ const {
     resetUserPassword,
     getSimulations,
     toggleSimulationVisibility,
+    autoDiscoverSimulations,
     syncSimulations,
     getUnits,
     toggleUnitVisibility,
@@ -35,6 +36,7 @@ router.put('/users/:id/reset-password', authorize('manager', 'owner'), passwordR
 // Owner only routes
 router.put('/users/:id/role', authorize('owner'), idParamValidation, validate, updateUserRole);
 router.delete('/users/:id', authorize('owner'), idParamValidation, validate, deleteUser);
+router.post('/simulations/auto-discover', authorize('owner'), autoDiscoverSimulations);
 router.post('/simulations/sync', authorize('owner'), syncSimulations);
 
 // Manager and Owner routes

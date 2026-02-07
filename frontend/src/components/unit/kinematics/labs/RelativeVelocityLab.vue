@@ -1477,7 +1477,12 @@ const drawMan = (ctx, x, y) => {
     // Animation parameters
     // Stop animation completely when speed is zero
     const t = props.v1 === 0 ? 0 : time.value * (5 + Math.abs(props.v1) * 0.8)
-    const facing = Math.sign(props.v1) || 1
+    
+    // Preserve facing direction when stationary
+    // Only update facing when actually moving
+    if (!drawMan.lastFacing) drawMan.lastFacing = 1  // Initialize
+    const facing = props.v1 === 0 ? drawMan.lastFacing : Math.sign(props.v1)
+    drawMan.lastFacing = facing  // Remember for next frame
 
     // Umbrella blocks rain from relative direction: V_rel = V_man - V_rain
     // Angle = atan2(V_man - V_rain_x, V_rain_y)
@@ -1489,7 +1494,8 @@ const drawMan = (ctx, x, y) => {
     let umbrellaAngle
     
     // Calculate Optimal logic first for both usage
-    const v_rel_x = props.v1 - v_rain_x
+    // Relative velocity: Rain relative to Man = V_rain - V_man
+    const v_rel_x = v_rain_x - props.v1  // Correct sign: rain - man
     const optimalAngleRad = Math.atan2(v_rel_x, v_rain_y)
     
     if (props.manualUmbrella) {
@@ -1856,9 +1862,15 @@ const drawRain = (ctx, x, y) => {
     // Rain angle
     // Vertical is variable (props.rainSpeed). Horizontal is relative to the observer frame!
     // JEE Context: V_rain_ground = (v2, v_rain_y). V_man_ground = (v1, 0).
-    const v_rain_y = props.rainSpeed
-    const vx = (props.observerFrame === 'obj1' || props.observerFrame === 'Man') ? (props.v2 - props.v1) : props.v2
-    const vy = v_rain_y
+    
+    // Defensive: ensure valid values (prevent disappearing rain when inputs cleared)
+    const v_rain_y = props.rainSpeed || 10  // Fallback if undefined/null/0
+    const v1_safe = props.v1 || 0
+    const v2_safe = props.v2 || 0
+    const vx = (props.observerFrame === 'obj1' || props.observerFrame === 'Man') 
+        ? (v2_safe - v1_safe) 
+        : v2_safe
+    const vy = Math.max(v_rain_y, 0.5)  // Ensure minimum falling speed
     
     // Correct rotation to align drop with vector(vx, vy)
     const dropAngle = -Math.atan2(vx, vy)
@@ -2314,7 +2326,7 @@ onUnmounted(() => {
 
 watch(() => props.mode, initSimulation)
 
-watch([() => props.v1, () => props.v2, () => props.angle1, () => props.angle2], () => {
+watch([() => props.v1, () => props.v2, () => props.angle1, () => props.angle2, () => props.rainSpeed], () => {
     // Handle both generic IDs (A, B) and scenario-specific IDs (Man, Rain)
     const objA = objects.value.find(o => o.id === 'A' || o.id === 'Man')
     const objB = objects.value.find(o => o.id === 'B' || o.id === 'Rain')
@@ -2332,7 +2344,7 @@ watch([() => props.v1, () => props.v2, () => props.angle1, () => props.angle2], 
     if (objB) {
         if (props.mode === 'rain') {
             objB.vx = props.v2
-            objB.vy = 10
+            objB.vy = props.rainSpeed  // Use dynamic rainSpeed instead of hardcoded 10
             // Reset position if too far from man for visual continuity
             const man = objects.value.find(o => o.id === 'Man')
             if (man && Math.abs(objB.x - man.x) > 1000) objB.x = man.x

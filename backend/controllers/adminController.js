@@ -164,6 +164,85 @@ exports.toggleSimulationVisibility = asyncHandler(async (req, res, next) => {
     });
 });
 
+// @desc    Auto-discover simulations from frontend components
+// @route   POST /api/admin/simulations/auto-discover
+// @access  Private/Owner
+exports.autoDiscoverSimulations = asyncHandler(async (req, res, next) => {
+    const fs = require('fs');
+    const path = require('path');
+
+    const results = {
+        discovered: 0,
+        synced: 0,
+        errors: 0
+    };
+
+    // Define categories and their component paths
+    const categories = {
+        kinematics: path.join(__dirname, '../../frontend/src/views/unit/kinematics'),
+        electrostatics: path.join(__dirname, '../../frontend/src/views/unit/electrostatics'),
+        gravitation: path.join(__dirname, '../../frontend/src/views/unit/gravitation'),
+        experimental: path.join(__dirname, '../../frontend/src/views/skills')
+    };
+
+    const discoveredSimulations = [];
+
+    // Scan each category
+    for (const [category, dirPath] of Object.entries(categories)) {
+        try {
+            if (!fs.existsSync(dirPath)) {
+                console.log(`Directory not found: ${dirPath}`);
+                continue;
+            }
+
+            const files = fs.readdirSync(dirPath);
+
+            for (const file of files) {
+                if (file.endsWith('.vue') && !file.includes('NavBar') && !file.includes('Sidebar') && !file.includes('Background')) {
+                    const simId = file.replace('.vue', '')
+                        .replace(/([A-Z])/g, '-$1')
+                        .toLowerCase()
+                        .replace(/^-/, '');
+
+                    const simName = file.replace('.vue', '')
+                        .replace(/([A-Z])/g, ' $1')
+                        .trim();
+
+                    discoveredSimulations.push({
+                        simulationId: simId,
+                        name: simName,
+                        category: category
+                    });
+                    results.discovered++;
+                }
+            }
+        } catch (err) {
+            console.error(`Error scanning ${category}:`, err.message);
+            results.errors++;
+        }
+    }
+
+    // Sync discovered simulations to database
+    for (const simData of discoveredSimulations) {
+        try {
+            let sim = await Simulation.findOne({ simulationId: simData.simulationId });
+            if (!sim) {
+                await Simulation.create(simData);
+                results.synced++;
+            }
+        } catch (err) {
+            console.error(`Error syncing ${simData.simulationId}:`, err.message);
+            results.errors++;
+        }
+    }
+
+    res.status(200).json({
+        success: true,
+        message: `Auto-discovery complete. Discovered ${results.discovered} simulations, synced ${results.synced} new ones.`,
+        data: results
+    });
+});
+
 // @desc    Sync simulations list
 // @route   POST /api/admin/simulations/sync
 // @access  Private/Owner

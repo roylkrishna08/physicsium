@@ -38,13 +38,19 @@ const emit = defineEmits([
   'update:showTheta'
 ])
 
+// Helper to sanitize numeric inputs (prevent NaN when field is cleared)
+const sanitizeNumber = (value) => {
+  const num = parseFloat(value)
+  return isNaN(num) ? 0 : num
+}
+
 // Computed umbrella angle for Rain scenario
 const umbrellaAngleDisplay = computed(() => {
   if (props.mode !== 'rain') return '0.0°'
   
   // Calculate relative velocity components
   const v_rel_x = props.v2 - props.v1  // Air Speed - Man Speed
-  const v_rel_y = 10                   // Constant vertical rain speed
+  const v_rel_y = props.rainSpeed || 10  // Dynamic vertical rain speed with fallback
   
   // Calculate angle from vertical
   const angleRad = Math.atan2(v_rel_x, v_rel_y)
@@ -135,9 +141,14 @@ const deleteObject = () => {
                         mode === 'aeroplane' ? 'Air Speed (v₁)' : 'Speed A (v₁)'
                     }}
                 </span>
-                <input type="number" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="number-input small">
+                <input type="number" step="0.1" :value="v1" @input="emit('update:v1', sanitizeNumber($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="0" :max="20" step="0.1" :value="v1" @input="emit('update:v1', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="-20" :max="20" step="0.1" :value="v1" @input="emit('update:v1', sanitizeNumber($event.target.value))" class="range-slider">
+            <div class="slider-labels" v-if="mode === 'rain'" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">
+                <span>&lt; Walk Left</span>
+                <span>0</span>
+                <span>Walk Right &gt;</span>
+            </div>
         </div>
 
         <div class="slider-item">
@@ -148,9 +159,9 @@ const deleteObject = () => {
                         mode === 'river' ? 'River Speed (v₂)' : 'Speed B (v₂)'
                     }}
                 </span>
-                <input type="number" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="number-input small">
+                <input type="number" step="0.1" :value="v2" @input="emit('update:v2', sanitizeNumber($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="mode === 'rain' ? -15 : 0" :max="20" step="0.1" :value="v2" @input="emit('update:v2', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="mode === 'rain' ? -15 : 0" :max="20" step="0.1" :value="v2" @input="emit('update:v2', sanitizeNumber($event.target.value))" class="range-slider">
             <div class="slider-labels" v-if="mode === 'rain'" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">
                 <span>&lt; Left</span>
                 <span>0</span>
@@ -162,9 +173,9 @@ const deleteObject = () => {
         <div class="slider-item" v-if="mode === 'rain'">
             <div class="slider-header">
                  <span class="label">Rain Vertical Speed</span>
-                 <input type="number" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="number-input small">
+                 <input type="number" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', sanitizeNumber($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="5" :max="25" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="5" :max="25" step="1" :value="rainSpeed" @input="emit('update:rainSpeed', sanitizeNumber($event.target.value))" class="range-slider">
         </div>
     </div>
 
@@ -179,9 +190,9 @@ const deleteObject = () => {
             <div class="slider-item" :style="{ opacity: manualUmbrella ? 1 : 0.6, pointerEvents: manualUmbrella ? 'auto' : 'none' }">
                 <div class="slider-header">
                     <span class="label">Umbrella Angle</span>
-                    <input type="number" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', parseFloat($event.target.value))" class="number-input small" :readonly="!manualUmbrella">
+                    <input type="number" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', sanitizeNumber($event.target.value))" class="number-input small" :readonly="!manualUmbrella">
                 </div>
-                <input type="range" :min="-90" :max="90" step="1" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', parseFloat($event.target.value))" class="range-slider">
+                <input type="range" :min="-90" :max="90" step="1" :value="umbrellaAngle" @input="emit('update:umbrellaAngle', sanitizeNumber($event.target.value))" class="range-slider">
                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px; text-align: center;" v-if="!manualUmbrella">
                     (Auto-calculated to keep dry)
                 </div>
@@ -193,9 +204,9 @@ const deleteObject = () => {
         <div class="slider-item" v-if="['river', 'aeroplane', 'angular-velocity', 'min-distance'].includes(mode)">
             <div class="slider-header">
                 <span class="label">{{ mode === 'river' ? (visualTheme === 'swimmer' ? 'Swimmer Direction' : 'Boat Heading Angle') : 'Angle A' }}</span>
-                <input type="number" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="number-input small">
+                <input type="number" step="1" :value="angle1" @input="emit('update:angle1', sanitizeNumber($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="0" :max="360" step="1" :value="angle1" @input="emit('update:angle1', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="0" :max="360" step="1" :value="angle1" @input="emit('update:angle1', sanitizeNumber($event.target.value))" class="range-slider">
             
             <!-- Quick-Set JEE Options for River Boat -->
             <div class="quick-presets" v-if="mode === 'river'" style="display: flex; gap: 8px; margin-top: 10px;">
@@ -220,9 +231,9 @@ const deleteObject = () => {
         <div class="slider-item" v-if="['aeroplane', 'angular-velocity', 'flag-flutter'].includes(mode)">
             <div class="slider-header">
                 <span class="label">{{ mode === 'flag-flutter' ? 'Wind Angle' : 'Angle B' }}</span>
-                <input type="number" step="1" :value="angle2" @input="emit('update:angle2', parseFloat($event.target.value))" class="number-input small">
+                <input type="number" step="1" :value="angle2" @input="emit('update:angle2', sanitizeNumber($event.target.value))" class="number-input small">
             </div>
-            <input type="range" :min="0" :max="360" step="1" :value="angle2" @input="emit('update:angle2', parseFloat($event.target.value))" class="range-slider">
+            <input type="range" :min="0" :max="360" step="1" :value="angle2" @input="emit('update:angle2', sanitizeNumber($event.target.value))" class="range-slider">
         </div>
     </div>
 

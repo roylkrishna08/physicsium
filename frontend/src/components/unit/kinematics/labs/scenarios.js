@@ -293,7 +293,7 @@ export const scenarios = {
                     x: cx,
                     y: cy - 200,
                     vx: props.v2, // Air Speed
-                    vy: 10,       // Constant Gravity
+                    vy: props.rainSpeed,       // Dynamic rain fall speed
                     color: '#00d4ff',
                     label: 'Rain',
                     type: 'rain'
@@ -327,6 +327,7 @@ export const scenarios = {
             const timeScale = 5
 
             if (man) {
+                man.vx = props.v1  // Sync man velocity from props
                 man.x += man.vx * dt * timeScale
                 // Tighter cyclic wrapping for visual loop
                 const limit = 400
@@ -335,13 +336,15 @@ export const scenarios = {
             }
 
             if (rain) {
+                // Sync rain velocity from props
+                rain.vx = props.v2
+                rain.vy = props.rainSpeed
                 rain.x += rain.vx * dt * timeScale
-                // Link rain source wrapping to man for consistancy, or let it follow man logic
-                // Rain source typically covers the sky, but here it's a point source. 
-                // Let's just let it move with wind.
-
-                // If Man wraps, we should probably wrap Rain to keep them relatively close?
-                // The parent component handles rain-snap, so we just update position here.
+                // Link rain source wrapping to man for consistency
+                // Wrap rain to keep it relatively close to man
+                const limit = 800
+                if (rain.x > limit) rain.x = -limit
+                if (rain.x < -limit) rain.x = limit
             }
 
             // Update Clouds
@@ -448,7 +451,7 @@ export const scenarios = {
             const v_rel_x = props.v2 - props.v1
             const v_rel_y = props.rainSpeed
             const v_rel_mag = Math.sqrt(v_rel_x * v_rel_x + v_rel_y * v_rel_y)
-            const optimalAngle = Math.atan2(props.v1 - props.v2, props.rainSpeed) * 180 / Math.PI
+            const optimalAngle = Math.atan2(v_rel_x, props.rainSpeed) * 180 / Math.PI
 
             return [
                 { label: 'v_RM (Mag)', value: v_rel_mag.toFixed(1) + ' m/s' },

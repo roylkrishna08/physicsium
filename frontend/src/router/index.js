@@ -180,6 +180,39 @@ const router = createRouter({
             name: 'settings',
             component: () => import('../views/user/Settings.vue'),
             meta: { requiresAuth: true, hideNav: true }
+        },
+        {
+            path: '/adminlogin',
+            name: 'admin-login',
+            component: () => import('../views/admin/AdminLogin.vue'),
+            meta: { guestOnly: true, hideNav: true }
+        },
+        {
+            path: '/admin',
+            component: () => import('../views/admin/DashboardLayout.vue'),
+            meta: { requiresAdmin: true, hideNav: true },
+            children: [
+                {
+                    path: '',
+                    name: 'admin-dashboard',
+                    component: () => import('../views/admin/AdminDashboard.vue')
+                },
+                {
+                    path: 'users',
+                    name: 'admin-users',
+                    component: () => import('../views/admin/UserManagement.vue')
+                },
+                {
+                    path: 'simulations',
+                    name: 'admin-simulations',
+                    component: () => import('../views/admin/SimulationManagement.vue')
+                },
+                {
+                    path: 'units',
+                    name: 'admin-units',
+                    component: () => import('../views/admin/UnitManagement.vue')
+                }
+            ]
         }
     ],
     scrollBehavior(to, from, savedPosition) {

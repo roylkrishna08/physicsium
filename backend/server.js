@@ -113,6 +113,10 @@ const startServer = async () => {
     try {
         await connectDB();
 
+        // Auto-setup admin user from environment variables
+        const setupAdmin = require('./scripts/setupAdmin');
+        await setupAdmin();
+
         const PORT = process.env.PORT || 5000;
         const server = app.listen(PORT, () => {
             console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
