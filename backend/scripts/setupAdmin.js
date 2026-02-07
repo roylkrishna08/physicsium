@@ -22,15 +22,25 @@ async function setupAdmin() {
             return;
         }
 
-        // Check if admin user already exists
-        let adminUser = await User.findOne({ username: adminUsername });
+        // Generate email based on username to avoid conflicts
+        const adminEmail = `${adminUsername}@physicsium.com`;
+
+        // Check if admin user already exists by username OR email
+        let adminUser = await User.findOne({
+            $or: [
+                { username: adminUsername },
+                { email: adminEmail }
+            ]
+        });
 
         if (adminUser) {
             // Update existing admin user
             console.log(`🔄 Updating existing admin user: ${adminUsername}`);
 
-            // Update password and ensure role is owner
+            // Update password, email, and ensure role is owner
             adminUser.password = adminPassword; // Will be hashed by pre-save hook
+            adminUser.email = adminEmail; // Update email if changed
+            adminUser.username = adminUsername; // Ensure username is correct
             adminUser.role = 'owner';
             adminUser.isRestricted = false;
             await adminUser.save();
@@ -43,7 +53,7 @@ async function setupAdmin() {
             adminUser = await User.create({
                 firstName: 'Admin',
                 lastName: 'User',
-                email: 'admin@physicsium.com',
+                email: adminEmail,
                 username: adminUsername,
                 password: adminPassword, // Will be hashed by pre-save hook
                 role: 'owner',
@@ -58,6 +68,7 @@ async function setupAdmin() {
 
     } catch (error) {
         console.error('❌ Error setting up admin user:', error.message);
+        // Don't crash the server, just log the error
     }
 }
 
